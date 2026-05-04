@@ -1,0 +1,219 @@
+# Apex Grid — AI Coding Rules
+
+You are working with `apex-grid`, a Lit-based web-component data grid by ApexCharts.
+Documentation: https://github.com/apexcharts/apexgrid
+NPM: apex-grid (note the hyphen)
+GitHub: https://github.com/apexcharts/apexgrid
+
+## Critical Rules
+
+1. **It's a custom element, not a JS class.** Don't `new ApexGrid(...)`. Render `<apex-grid>` in the DOM and set `.data` / `.columns` as properties.
+2. **Register once at app startup**: `import 'apex-grid/define'` (auto-registers) or `import { ApexGrid } from 'apex-grid'; ApexGrid.register();`.
+3. **Package name is `apex-grid` with a hyphen.** There is no `apexgrid` package.
+4. **`data` and `columns` are properties, not attributes.** Use property binding (`.columns=${...}` / `:columns=` / `[columns]=` / `el.columns = ...`).
+5. **`column.key` must be a real `keyof T`.** No `field` / `dataIndex` aliases.
+6. **`type` is `'string' | 'number' | 'boolean'` only.** No `'date'` type — use timestamps or ISO strings with a custom `comparer` / `cellTemplate`.
+7. **`sort` and `filter` per-column default to `false`.** Set `sort: true` / `filter: true` to enable, or pass a config object.
+8. **`cellTemplate` / `headerTemplate` must return a Lit `TemplateResult`** — `html\`...\``, not a string.
+9. **Sort/filter events fire only for UI-initiated operations.** Programmatic `grid.sort(...)` / `grid.filter(...)` are silent.
+10. **`sorting` and `filtering` events are cancellable** and `event.detail` is mutable.
+11. **For server-side data, use `dataPipelineConfiguration.sort` / `.filter`** async hooks. The built-in pipeline is skipped for whichever operation has a hook.
+12. **`autoGenerate` is ignored if `columns` is non-empty.** Reset `grid.columns = []` before re-assigning data to re-trigger.
+13. **Rows are virtualized.** `grid.rows` only contains rendered rows. Use `grid.dataView` / `grid.totalItems` for the full post-pipeline result.
+14. **Apex Grid depends on `igniteui-webcomponents`** for filter/sort UI. Don't try to remove it.
+
+---
+
+## Column Configuration
+
+```ts
+import type { ColumnConfiguration } from 'apex-grid';
+
+type User = { id: number; name: string; age: number; subscribed: boolean };
+
+const columns: ColumnConfiguration<User>[] = [
+  { key: 'id',         type: 'number',  sort: true, filter: true, headerText: 'ID' },
+  { key: 'name',       type: 'string',  sort: true, filter: true },
+  { key: 'age',        type: 'number',  sort: true, filter: true, width: '100px' },
+  { key: 'subscribed', type: 'boolean', sort: true, filter: true },
+];
+```
+
+Per-column fields: `key` (required), `type`, `headerText`, `width`, `hidden`, `resizable`, `sort`, `filter`, `headerTemplate`, `cellTemplate`.
+
+`sort` accepts `boolean | { caseSensitive?, comparer? }`.
+`filter` accepts `boolean | { caseSensitive? }`.
+
+### Templates
+
+```ts
+import { html } from 'lit';
+
+cellTemplate: ({ value, row, parent, column }) =>
+  html`<strong>${value}</strong>`,
+
+headerTemplate: ({ column }) =>
+  html`<em>${column.headerText ?? String(column.key)}</em>`,
+```
+
+---
+
+## Lifecycle
+
+```ts
+import 'apex-grid/define';                       // 1. register once at startup
+import { html, render } from 'lit';
+
+render(html`<apex-grid></apex-grid>`, document.getElementById('app')!);
+
+const grid = document.querySelector('apex-grid')!;
+grid.columns = columns;                           // 2. set properties
+grid.data = data;
+
+grid.addEventListener('sorted', (e) => {});       // 3. UI events
+grid.sort({ key: 'name', direction: 'ascending' });  // 4. programmatic (silent)
+
+// No destroy() — removing the element triggers Lit's disconnectedCallback.
+```
+
+---
+
+## API
+
+| Property | Type |
+|---|---|
+| `data` | `T[]` |
+| `columns` | `ColumnConfiguration<T>[]` |
+| `autoGenerate` | `boolean` |
+| `sortConfiguration` | `{ multiple, triState }` |
+| `dataPipelineConfiguration` | `{ sort?, filter? }` |
+| `sortExpressions` | `SortExpression<T>[]` (get/set) |
+| `filterExpressions` | `FilterExpression<T>[]` (get/set) |
+| `rows` (getter) | `ApexGridRow<T>[]` (rendered only) |
+| `dataView` (getter) | `readonly T[]` |
+| `totalItems` (getter) | `number` |
+
+| Method | Description |
+|---|---|
+| `sort(expr \| expr[])` | Programmatic sort (no events). |
+| `filter(expr \| expr[])` | Programmatic filter (no events). |
+| `clearSort(key?)` | Clear sort state. |
+| `clearFilter(key?)` | Clear filter state. |
+| `getColumn(keyOrIndex)` | Find column. |
+| `updateColumns(col \| col[])` | Merge changes by `key`. |
+| `ApexGrid.register()` | Static; registers `<apex-grid>` (idempotent). |
+| `ApexGrid.tagName` | `'apex-grid'`. |
+
+---
+
+## Filter Operands
+
+```ts
+import { StringOperands, NumberOperands, BooleanOperands } from 'apex-grid';
+```
+
+| Type | Operand keys |
+|---|---|
+| `'string'` | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
+| `'number'` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
+| `'boolean'` | `all`, `true`, `false`, `empty`, `notEmpty` |
+
+```ts
+grid.filter({ key: 'name', condition: 'contains', searchTerm: 'ad' });
+// or
+grid.filter({ key: 'name', condition: StringOperands.contains, searchTerm: 'ad' });
+
+// AND/OR
+grid.filter([
+  { key: 'age', condition: 'greaterThan', searchTerm: 30 },
+  { key: 'age', condition: 'lessThan',    searchTerm: 50, criteria: 'and' },
+]);
+```
+
+---
+
+## Events
+
+```ts
+grid.addEventListener('sorting',   (e) => { /* CustomEvent<SortExpression<T>>; cancellable */ });
+grid.addEventListener('sorted',    (e) => { /* CustomEvent<SortExpression<T>> */ });
+grid.addEventListener('filtering', (e) => { /* CustomEvent<{ key, expressions, type }>; cancellable */ });
+grid.addEventListener('filtered',  (e) => { /* CustomEvent<{ key, state }> */ });
+```
+
+Programmatic `grid.sort(...)` / `grid.filter(...)` do **not** emit these events.
+
+---
+
+## Server-Side Data
+
+```ts
+grid.dataPipelineConfiguration = {
+  sort: async ({ data, grid }) => {
+    return fetch('/api/sort', { method: 'POST', body: JSON.stringify(grid.sortExpressions) })
+      .then((r) => r.json());
+  },
+  filter: async ({ data, grid }) => {
+    return fetch('/api/filter', { method: 'POST', body: JSON.stringify(grid.filterExpressions) })
+      .then((r) => r.json());
+  },
+};
+```
+
+Skip a hook to keep the in-memory pipeline for that operation.
+
+---
+
+## Pitfalls — ❌ Wrong vs ✅ Correct
+
+### 1. `new ApexGrid(...)`
+❌ `new ApexGrid({ container, columns, data })`.
+✅ Render `<apex-grid .data=${data} .columns=${columns}></apex-grid>`.
+
+### 2. Forgetting to register
+❌ Importing `ApexGrid` but never calling `register()`.
+✅ `import 'apex-grid/define'` at app startup, or `ApexGrid.register()` once.
+
+### 3. Wrong package name
+❌ `import ... from 'apexgrid'`.
+✅ `import ... from 'apex-grid'`.
+
+### 4. Stringified attribute
+❌ `<apex-grid columns="[...]">`.
+✅ `.columns=${columns}` / `:columns=` / `[columns]=` / `el.columns = ...`.
+
+### 5. `column.key` not a key of `T`
+❌ `{ key: 'fullName' }` when `User` has `firstName` + `lastName`.
+✅ Compute via `cellTemplate: ({ row }) => html\`${row.firstName} ${row.lastName}\``.
+
+### 6. String from `cellTemplate`
+❌ `cellTemplate: ({ value }) => \`<b>\${value}</b>\`` — renders as text.
+✅ `cellTemplate: ({ value }) => html\`<b>\${value}</b>\``.
+
+### 7. Listening for events on programmatic calls
+❌ `grid.addEventListener('sorting'); grid.sort(...)` — never fires.
+✅ Wrap the programmatic call yourself, or watch `grid.dataView`.
+
+### 8. Sorting numbers as strings
+❌ `{ key: 'age', sort: true }` (default `type: 'string'`).
+✅ `{ key: 'age', type: 'number', sort: true }`.
+
+### 9. `type: 'date'`
+❌ Not supported.
+✅ Use timestamps (`type: 'number'`) or ISO strings (`type: 'string'`) with a custom `comparer`.
+
+### 10. Empty-array sort/filter setter
+❌ `grid.sortExpressions = []` — no-op.
+✅ `grid.clearSort()`.
+
+### 11. Counting rows from `grid.rows`
+❌ `grid.rows.length === total` — virtualized.
+✅ `grid.totalItems` or `grid.dataView`.
+
+### 12. Re-auto-generate after data swap
+❌ `grid.data = newData` (with old columns).
+✅ `grid.columns = []; grid.data = newData;`.
+
+### 13. Operand mismatch
+❌ `grid.filter({ key: 'age', condition: 'contains' })` (string operand on number).
+✅ Match operand to type (or import typed operand: `NumberOperands.greaterThan`).

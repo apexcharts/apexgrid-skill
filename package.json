@@ -1,0 +1,50 @@
+{
+  "name": "apexgrid-skill",
+  "version": "1.0.0",
+  "description": "AI coding skill for the apex-grid web component — structured reference docs that help AI assistants (Claude, Cursor, Copilot, etc.) generate correct apex-grid code.",
+  "keywords": [
+    "apex-grid",
+    "apexgrid",
+    "data-grid",
+    "grid",
+    "table",
+    "web-component",
+    "lit",
+    "ai",
+    "skill",
+    "claude",
+    "cursor",
+    "copilot",
+    "documentation",
+    "reference"
+  ],
+  "author": "ApexCharts <info@apexcharts.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/apexcharts/apexgrid-skill#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apexcharts/apexgrid-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/apexcharts/apexgrid-skill/issues"
+  },
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./SKILL.md": "./SKILL.md",
+    "./references/*": "./references/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "SKILL.md",
+    "references"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
