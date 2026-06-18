@@ -4,6 +4,16 @@ AI coding skill for building UIs with the [`apex-grid`](https://github.com/apexc
 
 > **Naming heads-up.** The npm package is `apex-grid` (with a hyphen), the custom-element tag is `<apex-grid>`, and the exported class is `ApexGrid<T>`.
 
+> **Separate skill — one of the ApexCharts ecosystem skills.** This is the dedicated skill for **Apex Grid** (`apex-grid`), shipped as its own `apexgrid-skill` package and repo — distinct from the core `apexcharts-skill` and the other product skills. Each product has its own library and skill; use the one that matches yours:
+>
+> | Product | npm library | Skill package & repo |
+> |---|---|---|
+> | ApexCharts — charts | `apexcharts` | [`apexcharts-skill`](https://github.com/apexcharts/apexcharts-skill) |
+> | ApexGantt — Gantt / timeline | `apexgantt` | [`apexgantt-skill`](https://github.com/apexcharts/apexgantt-skill) |
+> | ApexTree — hierarchy / org charts | `apextree` | [`apextree-skill`](https://github.com/apexcharts/apextree-skill) |
+> | ApexSankey — flow / Sankey | `apexsankey` | [`apexsankey-skill`](https://github.com/apexcharts/apexsankey-skill) |
+> | **Apex Grid** — data grid · *this skill* | `apex-grid` | `apexgrid-skill` |
+
 ## What This Does
 
 AI models routinely get web-component grid code wrong: they treat `<apex-grid>` like a class with a constructor, forget to register the custom element, set `columns` as a stringified attribute, return strings (not Lit `TemplateResult`s) from `cellTemplate`, or expect events from programmatic `sort()` calls. This skill ships structured reference files so the assistant generates correct `apex-grid` code on the first try.
