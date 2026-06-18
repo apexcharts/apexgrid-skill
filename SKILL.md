@@ -1,19 +1,19 @@
 ---
 name: apex-grid
 description: >
-  AI skill for building UIs with the `apex-grid` web component (the Lit-based
-  ApexCharts data grid). Use whenever the user asks to create, configure, or
-  troubleshoot a sortable / filterable / virtualized data table with
-  `<apex-grid>`. Covers the generic `ColumnConfiguration<T>` shape, cell &
-  header templates that return Lit `TemplateResult`s, the
-  `sort` / `filter` / `sorted` / `filtered` events, programmatic
-  `sort()` / `filter()` / `clearSort()` / `clearFilter()` / `updateColumns()`
-  APIs, the `dataPipelineConfiguration` hooks for server-side data, and the
-  one-time `ApexGrid.register()` custom-element registration.
+  AI skill for building UIs with the `apex-grid` web component (a Lit-based
+  data grid by ApexCharts). Use whenever the user asks to create, configure, or
+  troubleshoot a sortable / filterable / paginated / editable / virtualized data
+  table with `<apex-grid>`. Covers the register-and-size setup (no theme import —
+  the grid styles itself via `--ag-*` CSS variables), the generic
+  `ColumnConfiguration<T>` shape with its 13 column types, Lit `cellTemplate`
+  requirements, sorting / filtering / quick-filter, pagination, inline editing,
+  row selection, master-detail and tree rows, CSV export, the UI-only event
+  model, and the `dataPipelineConfiguration` hooks for server-side data.
 metadata:
   author: ApexCharts
-  version: "1.0.0"
-  library_version: ">=0.0.0"
+  version: "2.0.0"
+  library_version: "3.0.1"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -23,64 +23,80 @@ metadata:
 
 # Apex Grid AI Skill
 
-> **Heads-up on naming.** The npm package is **`apex-grid`** (with a hyphen). The custom-element tag is **`<apex-grid>`**. The exported class is **`ApexGrid<T>`**. There is no `apexgrid` package — using `import ... from 'apexgrid'` will fail.
+## 1. Quickstart — produce a visible, styled grid
 
-## 1. Critical Rules
+The grid styles itself out of the box (borders, row separators, sort/filter UI) — there is **no theme CSS to import**. The one real gotcha is host sizing: the grid virtualizes rows, so it needs a bounded height or it collapses and renders nothing. Two setup steps: **register** the element and give it a **bounded height**, then bind `.data` / `.columns`.
 
-1. **Apex Grid is a Lit web component, not a JS class with a constructor.** You don't `new ApexGrid(...)`. You register the custom element once and then use `<apex-grid>` in the DOM, setting `.data` and `.columns` as JS properties.
-2. **Register the element exactly once at app startup**: either `import 'apex-grid/define'` (auto-registers as a side-effect) or `import { ApexGrid } from 'apex-grid'; ApexGrid.register();`. Without this, the tag renders as an empty inert element.
-3. **`columns` and `data` are properties, not attributes.** Always bind with the property syntax (`.columns=${...}` in Lit, `[columns]="..."` in Angular, `:columns=` in Vue, ref-based in plain JS) — never as a stringified `columns="..."` attribute.
-4. **`column.key` must be a real key of `T`** (the data row type). It is what the grid reads from each row, what sort/filter expressions reference, and what's emitted in events. There is no `field` / `dataIndex` / `accessor` alias.
-5. **`type` defaults to `'string'`.** Set it to `'number'` or `'boolean'` to get the right filter operands and comparer. There is no `'date'` type — use `'number'` (timestamps) or `'string'` (ISO) and a custom `comparer` / `cellTemplate`.
-6. **`sort` and `filter` per-column are `boolean | configObject`.** They are `false` by default — no opt-in, no UI. Set `sort: true` / `filter: true` to enable, or pass a config object for fine-grained control.
-7. **`cellTemplate` and `headerTemplate` must return Lit `TemplateResult`s** (`html\`...\``) — not strings, DOM nodes, or framework-specific JSX. Plain HTML strings render as escaped text.
-8. **Sort/filter events fire on UI-initiated operations only.** Programmatic calls (`grid.sort(...)`, `grid.filter(...)`) do not emit `sorting` / `sorted` / `filtering` / `filtered` events.
-9. **`sorting` and `filtering` events are cancellable** (`event.preventDefault()`) and their `event.detail` is mutable so you can rewrite the expression before it runs.
-10. **For server-side data, set `dataPipelineConfiguration.sort` / `.filter`** — async hooks that receive `{ data, grid, type }` and return the new array. The grid skips its built-in pipeline entirely when a hook is provided for that operation.
-11. **`autoGenerate` is ignored when `columns` is non-empty.** To re-trigger auto-generation after a data swap, set `grid.columns = []` first, then assign the new `data`.
-12. **`grid.rows` only returns currently rendered rows.** The grid uses `@lit-labs/virtualizer`, so off-screen rows are not in the DOM.
-13. **`apex-grid` depends on `igniteui-webcomponents`** for filter/sort UI controls. The package lists it as a runtime dependency — don't try to remove it.
+### 1.1 Install
 
----
+```bash
+npm install apex-grid lit
+```
 
-## 2. Data Format & Column Configuration
+`igniteui-webcomponents` is a regular (transitive) dependency — it installs automatically, and you do **not** import any theme CSS from it.
 
-Apex Grid is generic over a row type `T`:
+> Confirmed working versions: `apex-grid@3.0.1`, `lit@^3.0.0`.
+
+### 1.2 Register the element + size the host — `setup()` does both
+
+The one-call convenience export registers `<apex-grid>` and adopts a default host stylesheet (`height: 100%` with a `min-height: 240px` fallback) so the virtualizer has a bounded height:
 
 ```ts
-interface ColumnConfiguration<T extends object, K extends keyof T = keyof T> {
-  key: K;                                          // REQUIRED — must be a key of T
-  type?: 'string' | 'number' | 'boolean';          // default 'string'
-  headerText?: string;                             // default: the key itself
-  width?: string;                                  // any CSS width
-  hidden?: boolean;                                // default false
-  resizable?: boolean;                             // default false
-  sort?: boolean | { caseSensitive?: boolean; comparer?: (a: T[K], b: T[K]) => number };
-  filter?: boolean | { caseSensitive?: boolean };
-  headerTemplate?: (ctx: ApexHeaderContext<T>) => TemplateResult | unknown;
-  cellTemplate?: (ctx: ApexCellContext<T, K>) => TemplateResult | unknown;
+import { setup } from 'apex-grid';
+setup();                       // registers <apex-grid> + adopts host sizing. Idempotent.
+```
+
+Prefer manual control? Register with the side-effect import (or the static method) and size the host yourself:
+
+```ts
+import 'apex-grid/define';     // side-effect import, idempotent
+// or: import { ApexGrid } from 'apex-grid'; ApexGrid.register();
+```
+
+```css
+apex-grid { height: 480px; }   /* any explicit height; % works if the parent is sized too */
+```
+
+`setup({ hostStyles: false })` registers the element but skips the injected host CSS, leaving sizing entirely to you. Without a bounded height (from `setup()` or your own CSS) the grid collapses and shows no rows.
+
+> **Do not set `display` on `apex-grid`** — the component declares `:host { display: grid }` for its internal track layout; an outer `display` rule overrides it and collapses the virtualizer.
+
+### 1.3 Styling — `--ag-*` CSS custom properties (no theme import)
+
+The grid is styled out of the box and customized entirely through `--ag-*` CSS custom properties — there is **no theme file to import and no `configureTheme()` call**. Set the variables on `apex-grid` (or an ancestor):
+
+```css
+apex-grid {
+  height: 480px;
+  /* override any --ag-* variables to retheme; see the package README for the full list */
 }
 ```
 
-Minimal example:
+> The deprecated `theme` option (and `igniteui-webcomponents`' `configureTheme()`) does **not** change the grid's appearance — it only forwards to igniteui for apps that embed igniteui components alongside the grid. Omit it; use `--ag-*` variables instead.
+
+### 1.4 Minimal example — a styled, sortable, filterable table
 
 ```ts
 import { html, render } from 'lit';
-import 'apex-grid/define';                         // registers <apex-grid>
+import { setup } from 'apex-grid';
 import type { ColumnConfiguration } from 'apex-grid';
+
+setup();   // register + host sizing; no theme import needed
 
 type User = { id: number; name: string; age: number; subscribed: boolean };
 
 const data: User[] = [
-  { id: 1, name: 'Ada',  age: 36, subscribed: true  },
-  { id: 2, name: 'Carl', age: 41, subscribed: false },
+  { id: 1, name: 'Ada Lovelace',  age: 36, subscribed: true  },
+  { id: 2, name: 'Carl Sagan',    age: 62, subscribed: false },
+  { id: 3, name: 'Grace Hopper',  age: 85, subscribed: true  },
 ];
 
+// Explicit widths prevent the "last column stretches to fill" trap.
 const columns: ColumnConfiguration<User>[] = [
-  { key: 'id',         type: 'number',  sort: true, filter: true, headerText: 'ID' },
-  { key: 'name',       type: 'string',  sort: true, filter: true },
-  { key: 'age',        type: 'number',  sort: true, filter: true },
-  { key: 'subscribed', type: 'boolean', sort: true, filter: true },
+  { key: 'id',         type: 'number',  headerText: 'ID',         width: '80px',  sort: true, filter: true },
+  { key: 'name',       type: 'string',  headerText: 'Name',       width: '240px', sort: true, filter: true },
+  { key: 'age',        type: 'number',  headerText: 'Age',        width: '100px', sort: true, filter: true },
+  { key: 'subscribed', type: 'boolean', headerText: 'Subscribed', width: '140px', sort: true, filter: true },
 ];
 
 render(
@@ -89,322 +105,289 @@ render(
 );
 ```
 
-### Column types and filter operands
+### 1.5 What success looks like
 
-The `type` field selects which filter operand set is exposed in the filter UI:
+- **Visible borders** between rows and columns, and **hover state** on rows
+- **Sort arrows** (↕) next to each header (because `sort: true`)
+- A **filter row** below the headers with a "Filter" chip per column (because `filter: true`)
+- **Smooth virtualized scrolling** — only ~20 `<apex-grid-row>` elements exist in the DOM at once, even with thousands of rows
 
-| `type` | Operands available |
-|---|---|
-| `'string'` *(default)* | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
-| `'number'` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
-| `'boolean'` | `all`, `true`, `false`, `empty`, `notEmpty` |
+If rows don't render at all, it's almost always the host height (§1.2). If the grid looks bare, you don't need a theme import — check your `--ag-*` overrides aren't fighting the defaults.
 
-Programmatic filter expressions can reference operands by name (`condition: 'contains'`) or by importing them as a function:
-
-```ts
-import { StringOperands } from 'apex-grid';
-
-grid.filter({ key: 'name', condition: StringOperands.contains, searchTerm: 'ada' });
-// or shorthand
-grid.filter({ key: 'name', condition: 'contains', searchTerm: 'ada' });
-```
-
-### Cell & header templates (Lit)
-
-Templates are Lit render callbacks. They receive a context object and must return a `TemplateResult`.
-
-```ts
-const columns: ColumnConfiguration<User>[] = [
-  {
-    key: 'name',
-    cellTemplate: ({ value, row, parent, column }) => html`
-      <strong style="color:#1f4ed8">${value}</strong>
-    `,
-  },
-  {
-    key: 'subscribed',
-    type: 'boolean',
-    cellTemplate: ({ value }) => html`
-      <input type="checkbox" .checked=${value} disabled />
-    `,
-  },
-  {
-    key: 'age',
-    headerTemplate: ({ column }) => html`
-      <em>${column.headerText ?? String(column.key)}</em>
-    `,
-  },
-];
-```
-
-Context shapes:
-
-```ts
-interface ApexCellContext<T, K extends keyof T> {
-  parent: ApexGridCell<T>;        // the cell element
-  row:    ApexGridRow<T>;         // the row element
-  column: ColumnConfiguration<T, K>;
-  value:  T[K];
-}
-
-interface ApexHeaderContext<T> {
-  parent: ApexGridHeader<T>;
-  column: ColumnConfiguration<T>;
-}
-```
-
-### Auto-generated columns
-
-`auto-generate` (or `.autoGenerate=${true}`) infers columns from the first data row's keys. **It is ignored if `columns` is non-empty.** To re-trigger after a data swap:
-
-```ts
-grid.columns = [];                   // reset first
-grid.data = newData;                 // then replace data — columns are inferred
-```
+> **Dev-server reminder.** ES module imports need an HTTP server — opening via `file://` fails with CORS errors. Use Vite (`npm create vite@latest`), any static server, or your framework's dev server.
 
 ---
 
-## 3. Public API
+## 2. Naming — `apex-grid` vs `<apex-grid>` vs `ApexGrid`
 
-### Properties
+| Form | What it is |
+|---|---|
+| `apex-grid` | The **npm package name**. `import { ApexGrid } from 'apex-grid'`. With a hyphen. **There is no `apexgrid` package.** |
+| `<apex-grid>` | The **HTML custom-element tag** rendered into the DOM. |
+| `ApexGrid<T>` | The **exported class**. Used for types, the static `register()` method, and `ApexGrid.tagName`. |
 
-| Property | Type | Default | Notes |
-|---|---|---|---|
-| `data` | `T[]` | `[]` | Row data. Setting it triggers a pipeline run. |
-| `columns` | `ColumnConfiguration<T>[]` | `[]` | Column definitions. Each entry is merged with `DEFAULT_COLUMN_CONFIG`. |
-| `autoGenerate` | `boolean` (attr `auto-generate`) | `false` | Infer columns from data. Ignored when `columns` is non-empty. |
-| `sortConfiguration` | `{ multiple: boolean; triState: boolean }` | `{ true, true }` | Grid-wide sort behaviour. |
-| `dataPipelineConfiguration` | `{ sort?, filter? }` | — | Server-side / async data hooks. |
-| `sortExpressions` | `SortExpression<T>[]` | `[]` | Get/set the active sort state. Setting an empty array is a no-op — use `clearSort()`. |
-| `filterExpressions` | `FilterExpression<T>[]` | `[]` | Get/set the active filter state. Empty-set semantics same as above. |
-| `rows` | `ApexGridRow<T>[]` *(getter)* | — | Currently rendered rows only (virtualized). |
-| `dataView` | `readonly T[]` *(getter)* | — | Data after sort + filter pipeline. |
-| `totalItems` | `number` *(getter)* | — | `dataView.length`. |
+AI models trained before the package was published may suggest `apexgrid` (no hyphen) or treat `ApexGrid` as a class constructor — both are wrong.
+
+---
+
+## 3. Critical Rules
+
+1. **Apex Grid is a Lit web component, not a JS class with a constructor.** You don't `new ApexGrid(...)`. Render `<apex-grid>` in the DOM and set `.data` / `.columns` as properties.
+
+2. **Two setup steps for a visible grid:** register the element and give the host a bounded height — `setup()` does both (§1.2). **No theme CSS import is required** (§1.3); the grid styles itself via `--ag-*` variables. The classic failure is an unsized host → no rows.
+
+3. **`columns` and `data` are properties, not attributes.** Use property binding (`.columns=${...}` in Lit, `[columns]=` in Angular, `:columns.prop=` in Vue, `el.columns = ...` in vanilla JS). A stringified `columns="[...]"` HTML attribute becomes the literal string and the grid renders nothing.
+
+4. **`column.key` must be a real `keyof T`.** No `field` / `dataIndex` / `accessor` aliases. To display a derived value, compute it in `cellTemplate` (which has `row` access).
+
+5. **Set `type` per column.** The primitive types `'string'`, `'number'`, `'boolean'` drive the default sort comparer, filter operands, and editor. The default is `'string'` — leaving a numeric column unset sorts as strings ("10" before "9"). There are also presentation types — `'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'` — that change rendering while sorting/filtering as their underlying value (§4).
+
+6. **`cellTemplate` / `headerTemplate` / `editorTemplate` must return Lit `TemplateResult`s** — values from an `` html`...` `` tagged template. Returning a plain string renders as escaped text.
+
+7. **Sort/filter (and the other `*-ing`/`*-ed`) events fire only for UI-initiated operations.** Programmatic `grid.sort(...)` / `grid.filter(...)` calls apply silently. To react to every change regardless of source, watch `grid.dataView`.
+
+8. **Features are opt-in via config objects.** Sorting/filtering are per-column (`sort`/`filter`); editing, selection, pagination, tree, and master-detail expansion are enabled via the grid-level `editing` / `selection` / `pagination` / `tree` / `expansion` properties (§5).
+
+---
+
+## 4. Data & Columns
+
+Apex Grid is generic over a row type `T extends object`:
+
+```ts
+interface ColumnConfiguration<T extends object, K extends keyof T = keyof T> {
+  key: K;                                  // REQUIRED — must be a keyof T
+  type?: DataType;                         // default 'string' (see column types below)
+  headerText?: string;                     // default: String(key)
+  width?: string;                          // any CSS width — recommended in practice
+  hidden?: boolean;                        // default false
+  resizable?: boolean;                     // default false
+  pinned?: 'start' | 'end' | null;         // freeze to a side during horizontal scroll
+  reorderable?: boolean;                   // per-column opt-out of drag reorder
+  exportable?: boolean;                    // default true; false omits from CSV export
+  sort?:   boolean | { caseSensitive?: boolean; comparer?: (a: T[K], b: T[K]) => number };
+  filter?: boolean | { caseSensitive?: boolean };
+  editable?: boolean;                      // requires grid `editing.enabled`
+  headerTemplate?:  (ctx: ApexHeaderContext<T>) => TemplateResult | unknown;
+  cellTemplate?:    (ctx: ApexCellContext<T, K>) => TemplateResult | unknown;
+  editorTemplate?:  (ctx: ApexEditorContext<T, K>) => TemplateResult | unknown;
+  // Type-specific options (each is ignored unless `type` matches):
+  options?: (V | { value: V; label?: string })[];   // type: 'select'
+  max?: number;                            // 'rating' star count (5) / 'progress' full value (100)
+  format?: 'short' | 'medium' | 'long' | 'full';     // 'date' display (default 'medium')
+  shape?: 'square' | 'circle';             // 'image' crop (default 'square')
+  alt?: string;                            // 'image' alt text
+  currency?: string;                       // 'currency' ISO 4217 code (default 'USD')
+  locale?: string;                         // 'currency' BCP 47 locale
+  badgeVariant?: 'gold' | 'brand' | 'neutral' | 'muted' | ((v) => …);   // 'badge'
+  statusVariant?: 'active' | 'trial' | 'churn' | ((v) => …);            // 'status'
+  showDelta?: boolean;                     // 'sparkline' trailing delta label (default true)
+}
+```
+
+Applied defaults (`DEFAULT_COLUMN_CONFIG`): `{ type: 'string', resizable: false, hidden: false, sort: false, filter: false }`. Sort and filter are **off** until you opt in. (`exportable` isn't in that object but behaves as `true` unless set to `false`.)
+
+### Column types (`DataType`)
+
+`type` is both the data type and, for the built-ins, the presentation renderer. The three primitive types drive sort/filter/editing; the rest are renderers over a primitive value (and sort/filter as that underlying value):
+
+| `type` | Renders / behaves as |
+|---|---|
+| `'string'` | text (default); text editor |
+| `'number'` | number; number editor |
+| `'boolean'` | check-mark icon (true) / dimmed (false); checkbox editor |
+| `'select'` | label from `options`; `<select>` editor. Sorts/filters as its value |
+| `'rating'` | 0..`max` (default 5) as stars; star-picker editor. Numeric |
+| `'date'` | locale date (`format` preset); `<input type="date">` editor. Accepts `Date`/ISO/timestamp |
+| `'image'` | `<img>` (`shape` `'square'`/`'circle'`, `alt`) |
+| `'currency'` | `Intl.NumberFormat` (`currency`, `locale`). Numeric |
+| `'avatar'` | first letter in a tinted circle |
+| `'badge'` | colored pill (`badgeVariant`) |
+| `'progress'` | health bar, 0..`max` (default 100) |
+| `'sparkline'` | inline trend chart of a `number[]` (`showDelta`) |
+| `'status'` | dot + pill (`statusVariant`, or inferred) |
+
+> A `'date'` column **does** exist in 3.x — use `type: 'date'` (it accepts `Date`, ISO strings, or millisecond timestamps), not a string column with a custom comparer.
+
+### Column type → filter operands (primitive types)
+
+| `type` | Operand keys in the filter UI |
+|---|---|
+| `'string'` | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
+| `'number'` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
+| `'boolean'` | `all`, `true`, `false`, `empty`, `notEmpty` (all **unary** — no `searchTerm`) |
+
+```ts
+grid.filter({ key: 'subscribed', condition: 'true' });   // unary — no searchTerm
+```
+
+### Cell template
+
+Receives `ApexCellContext<T, K>` (`{ parent, row, column, value, commit? }`). Must return a Lit `TemplateResult`:
+
+```ts
+import { html } from 'lit';
+
+{ key: 'name', cellTemplate: ({ value, row }) => html`<strong>${value}</strong>` }
+```
+
+### Auto-generated columns — the 3-line demo
+
+```ts
+render(html`<apex-grid auto-generate .data=${data}></apex-grid>`, document.getElementById('app')!);
+```
+
+Auto-generates columns from `Object.keys(data[0])` and runtime types. `sort` / `filter` default to `false`, so the auto path is read-only. To re-trigger after a data swap, reset `grid.columns = []` first.
+
+For full column patterns — derived columns, header/editor templates, per-column styling — see `references/columns-and-templates.md`.
+
+---
+
+## 5. Lifecycle & API
+
+### Lifecycle pattern
+
+```ts
+import { setup } from 'apex-grid';
+setup();                                                  // register + host sizing; no theme import
+
+import { html, render } from 'lit';
+render(html`<apex-grid></apex-grid>`, document.getElementById('app')!);
+
+const grid = document.querySelector('apex-grid')!;
+grid.columns = columns;                                   // properties, after element is in DOM
+grid.data = data;
+
+grid.addEventListener('sorted', (e) => {});               // UI events
+grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silent)
+
+// No destroy() — removing the element triggers Lit's disconnectedCallback automatically.
+```
+
+### Core properties
+
+| Property | Type | Notes |
+|---|---|---|
+| `data` | `T[]` | Setting triggers a pipeline run. |
+| `columns` | `ColumnConfiguration<T>[]` | Each entry merged with column defaults. |
+| `autoGenerate` (attr `auto-generate`) | `boolean` | Ignored if `columns` is non-empty. |
+| `sortConfiguration` | `{ multiple, triState }` | Multi-column + tri-state sorting toggles. |
+| `dataPipelineConfiguration` | `{ sort?, filter?, pagination?, quickFilter? }` | Server-side / async hooks (§ data-pipeline). |
+| `quickFilter` (attr `quick-filter`) | `string` | Global substring search across visible columns. |
+| `showQuickFilter` / `showExport` | `boolean` | Toolbar UI toggles for quick-filter input / export menu. |
+| `columnReordering` (attr `column-reordering`) | `boolean` | Drag-reorder headers; per-column opt-out via `reorderable`. |
+| `sortExpressions` / `filterExpressions` | `…[]` (get/set) | Current state. To clear, use `clearSort()` / `clearFilter()`. |
+| `selectedRows` / `expandedRows` | `T[]` (get/set) | Snapshots; set to replace (goes through cancellable events). |
+| `rows` *(getter)* | `ApexGridRow<T>[]` | **Currently rendered only** (virtualized). |
+| `dataView` *(getter)* | `readonly T[]` | Full post-filter/sort data. |
+| `pageItems` *(getter)* | `readonly T[]` | Current page slice (= `dataView` if no pagination). |
+| `totalItems` / `pageCount` *(getters)* | `number` | Row / page totals. |
+| `page` / `pageSize` | `number` (get/set) | Current page (0-based) / page size. |
+
+### Feature config properties (opt-in)
+
+| Property | Shape |
+|---|---|
+| `editing` | `{ enabled, mode?: 'cell' \| 'row', trigger?: 'click' \| 'doubleClick' }` — plus per-column `editable: true` |
+| `selection` | `{ enabled, mode?: 'single' \| 'multiple', showCheckboxColumn? }` |
+| `pagination` | `{ enabled, mode?: 'local' \| 'remote', page?, pageSize?, pageSizeOptions?, totalItems? }` |
+| `tree` | `{ enabled, getDataPath: (row) => string[], groupColumnKey?, defaultExpanded?, childIndent? }` — flat data, hierarchy derived |
+| `expansion` | `{ enabled, detailTemplate: (ctx) => TemplateResult, isExpandable?, showToggleColumn? }` — master-detail |
+
+```ts
+grid.editing    = { enabled: true, mode: 'cell', trigger: 'doubleClick' };
+grid.selection  = { enabled: true, mode: 'multiple', showCheckboxColumn: true };
+grid.pagination = { enabled: true, pageSize: 25 };
+```
 
 ### Methods
 
 | Method | Description |
 |---|---|
-| `sort(expr \| expr[])` | Apply a sort. Does **not** fire `sorting` / `sorted` events. |
-| `filter(expr \| expr[])` | Apply a filter. Does **not** fire `filtering` / `filtered` events. |
-| `clearSort(key?)` | Clear all sort state, or just the column with `key`. |
-| `clearFilter(key?)` | Clear all filter state, or just the column with `key`. |
-| `getColumn(keyOrIndex)` | Find a column by `key` or numeric index. |
-| `updateColumns(col \| col[])` | Merge new properties into existing columns by `key`. Triggers a pipeline run. |
+| `sort(expr \| expr[])` / `filter(expr \| expr[])` | Programmatic. **No events.** |
+| `clearSort(key?)` / `clearFilter(key?)` | Clear all, or one column's, sort/filter state. |
+| `getColumn(keyOrIndex)` | Find a column. |
+| `updateColumns(col \| col[])` | Merge new fields into existing columns by `key`. Triggers a pipeline run. |
+| `moveColumn(fromKey, toKey, position?)` | Reorder a column (within its pinning group). |
+| `exportToCSV(options?)` / `exportAs(formatId, options?)` | Export the data. CSV is built in. |
+| selection | `selectRow`, `deselectRow`, `toggleRowSelection`, `selectAllRows`, `clearSelection`, `isRowSelected` |
+| expansion | `expandRow`, `collapseRow`, `toggleRowExpansion`, `expandAllRows`, `collapseAllRows`, `isRowExpanded` |
+| tree | `expandTreeRow`, `collapseTreeRow`, `toggleTreeRow`, `expandAllTreeRows`, `collapseAllTreeRows`, `isTreeRowExpanded` |
+| editing | `commitEdit()`, `cancelEdit()` (used with `mode: 'row'`) |
+| `ApexGrid.register()` / `ApexGrid.tagName` | Static element registration / `'apex-grid'`. |
 
-### Static
+### Events — UI-initiated only
 
-| Member | Description |
+Every event fires only for operations driven through the grid's own UI; programmatic API calls are silent. The `*-ing` events are **cancellable** (call `event.preventDefault()`); the `*-ed` events are notifications. `event.detail` carries the relevant payload.
+
+| Pairs (`-ing` cancellable / `-ed` after) | Triggered by |
 |---|---|
-| `ApexGrid.tagName` | The string `'apex-grid'`. |
-| `ApexGrid.register()` | Registers `<apex-grid>` and all internal sub-components. Idempotent. Either call this once, or import `'apex-grid/define'` for auto-registration. |
+| `sorting` / `sorted` | header sort |
+| `filtering` / `filtered` | filter-row change |
+| `quickFilterChanging` / `quickFilterChanged` | quick-filter input |
+| `pageChanging` / `pageChanged` | paginator |
+| `columnPinning` / `columnPinned` | pin/unpin |
+| `columnMoving` / `columnMoved` | header drag reorder |
+| `cellValueChanging` / `cellValueChanged` | inline edit commit |
+| `rowEditStarted` / `rowEditEnded` | row-edit session (`mode: 'row'`) |
+| `rowSelecting` / `rowSelected` | row selection |
+| `rowExpanding` / `rowExpanded` | master-detail expand |
+| `treeRowExpanding` / `treeRowExpanded` | tree-row expand |
+
+Operand reference, multi-column sort, and server-side hooks: `references/sort-and-filter.md` and `references/data-pipeline.md`.
 
 ---
 
-## 4. Events
+## 6. Pitfalls — ❌ Wrong vs ✅ Correct
 
-Events fire **only** when the user interacts with sort / filter UI. Programmatic `grid.sort(...)` / `grid.filter(...)` calls are silent.
-
-```ts
-import type { ApexGridEventMap } from 'apex-grid';
-
-grid.addEventListener('sorting', (e) => {
-  // CustomEvent<SortExpression<T>>
-  // e.detail is the expression about to be applied — mutate to rewrite, preventDefault to cancel
-  if (e.detail.direction === 'descending') {
-    e.preventDefault();
-  }
-});
-
-grid.addEventListener('sorted', (e) => {
-  // CustomEvent<SortExpression<T>>
-});
-
-grid.addEventListener('filtering', (e) => {
-  // CustomEvent<{ key, expressions, type: 'add'|'modify'|'remove' }>
-});
-
-grid.addEventListener('filtered', (e) => {
-  // CustomEvent<{ key, state: FilterExpression<T>[] }>
-});
-```
-
-| Event | Cancellable | `event.detail` |
-|---|---|---|
-| `sorting` | yes | `SortExpression<T>` (mutable) |
-| `sorted` | no | `SortExpression<T>` |
-| `filtering` | yes | `{ key: keyof T; expressions: FilterExpression<T>[]; type: 'add' \| 'modify' \| 'remove' }` |
-| `filtered` | no | `{ key: keyof T; state: FilterExpression<T>[] }` |
-
----
-
-## 5. Server-Side / Async Data — `dataPipelineConfiguration`
-
-When sort or filter should run on the server, supply async hooks. Each hook receives `{ data, grid, type }` and returns the new array. **The built-in pipeline is skipped for whichever operations have a hook.**
-
-```ts
-grid.dataPipelineConfiguration = {
-  sort: async ({ data, grid }) => {
-    const expressions = grid.sortExpressions;
-    return fetch('/api/users/sort', {
-      method: 'POST',
-      body: JSON.stringify(expressions),
-    }).then((r) => r.json());
-  },
-  filter: async ({ data, grid }) => {
-    const expressions = grid.filterExpressions;
-    return fetch('/api/users/filter', {
-      method: 'POST',
-      body: JSON.stringify(expressions),
-    }).then((r) => r.json());
-  },
-};
-```
-
-You can supply just `sort`, just `filter`, or both. Anything you don't override falls back to the in-memory pipeline.
-
----
-
-## 6. Programmatic Sort & Filter
-
-```ts
-import { StringOperands } from 'apex-grid';
-
-// Single sort
-grid.sort({ key: 'name', direction: 'ascending' });
-
-// Multiple (multi-column) sort — works only when sortConfiguration.multiple is true
-grid.sort([
-  { key: 'subscribed', direction: 'descending' },
-  { key: 'age',        direction: 'ascending'  },
-]);
-
-// Filter — by operand name
-grid.filter({ key: 'name', condition: 'contains', searchTerm: 'ad' });
-
-// Filter — by operand object (typed)
-grid.filter({ key: 'name', condition: StringOperands.contains, searchTerm: 'ad' });
-
-// Multiple filters with AND/OR
-grid.filter([
-  { key: 'age', condition: 'greaterThan', searchTerm: 30 },
-  { key: 'age', condition: 'lessThan',    searchTerm: 50, criteria: 'and' },
-]);
-
-// Clear
-grid.clearSort();              // all columns
-grid.clearSort('name');        // just `name`
-grid.clearFilter();
-grid.clearFilter('name');
-```
-
-`SortExpression<T>` and `FilterExpression<T>` are exported from `apex-grid` for typed arrays.
-
----
-
-## 7. Lifecycle Pattern
-
-```ts
-// 1. Register the custom element ONCE at app startup
-import 'apex-grid/define';
-// — or —
-import { ApexGrid } from 'apex-grid';
-ApexGrid.register();
-
-// 2. Stamp the element into the DOM
-import { html, render } from 'lit';
-render(html`<apex-grid></apex-grid>`, document.getElementById('app')!);
-
-// 3. Set properties (after the element is in the DOM)
-const grid = document.querySelector('apex-grid')!;
-grid.columns = [...];
-grid.data = [...];
-
-// 4. Listen for UI events
-grid.addEventListener('sorted', (e) => console.log(e.detail));
-
-// 5. Optional: programmatic operations
-grid.sort({ key: 'name', direction: 'ascending' });
-
-// 6. Removing the element from the DOM tears down its observers automatically.
-//    There is no destroy() — Lit's disconnectedCallback handles cleanup.
-```
-
----
-
-## 8. Pitfalls — ❌ Wrong vs ✅ Correct
-
-### 1. Treating it like a class-based JS API
-❌ `const grid = new ApexGrid({ container: '#app', columns, data })` — this is a custom element, not a constructor.
-✅ Render `<apex-grid .data=${data} .columns=${columns}></apex-grid>` and let the DOM instantiate it.
+### 1. Treating it like a class API
+❌ `const grid = new ApexGrid({ container: '#app', columns, data })`
+✅ Render `<apex-grid .data=${data} .columns=${columns}></apex-grid>`.
 
 ### 2. Forgetting to register the element
-❌ Importing `ApexGrid` but never calling `register()` — `<apex-grid>` renders as an inert tag.
-✅ `import 'apex-grid/define'` once, or `ApexGrid.register()` at app startup.
+❌ Importing `ApexGrid` but never registering.
+✅ `setup()` (or `import 'apex-grid/define'`) once at app startup.
 
-### 3. Wrong package name
-❌ `import { ApexGrid } from 'apexgrid'` — the package is `apex-grid` (with a hyphen).
-✅ `import { ApexGrid } from 'apex-grid'`.
+### 3. Importing a theme CSS that no longer exists
+❌ `import 'igniteui-webcomponents/themes/light/bootstrap.css'` + `configureTheme('bootstrap')` — obsolete; does not affect the grid.
+✅ Nothing to import — the grid styles itself; retheme via `--ag-*` CSS variables. The only required CSS is a host **height**.
 
 ### 4. Stringified `columns` attribute
-❌ `<apex-grid columns="[...]">` — attributes are strings; `columns` is an object array.
-✅ Property binding: `.columns=${columns}` (Lit), `:columns="columns"` (Vue), `[columns]="columns"` (Angular), or `el.columns = columns` (vanilla).
+❌ `<apex-grid columns="[...]">` — becomes the literal string `"[object Object],..."`.
+✅ Property binding: `.columns=${columns}` / `:columns.prop="columns"` / `[columns]="columns"` / `el.columns = columns`.
 
 ### 5. `column.key` not a real key of `T`
-❌ `{ key: 'fullName' }` when `User` has only `firstName` / `lastName`.
-✅ Either rename the field on `User` or compute it via `cellTemplate`: `cellTemplate: ({ row }) => html\`${row.firstName} ${row.lastName}\``.
+❌ `{ key: 'fullName' }` when `User` has only `firstName` + `lastName`.
+✅ Compute via template: `cellTemplate: ({ row }) => html\`${row.firstName} ${row.lastName}\``.
 
-### 6. Returning a string from `cellTemplate`
+### 6. String from `cellTemplate`
 ❌ `cellTemplate: ({ value }) => \`<strong>\${value}</strong>\`` — renders as escaped text.
 ✅ `cellTemplate: ({ value }) => html\`<strong>\${value}</strong>\``.
 
-### 7. Expecting events from programmatic calls
+### 7. Numbers sorted as strings
+❌ `{ key: 'age', sort: true }` (default `type: 'string'`) — "10" sorts before "9".
+✅ `{ key: 'age', type: 'number', sort: true }`.
+
+### 8. Reaching for a custom comparer to display dates
+❌ `{ key: 'created', type: 'string', sort: { comparer: ... } }` to fake date handling.
+✅ `{ key: 'created', type: 'date', format: 'medium' }` — a real type; accepts `Date`, ISO strings, or millisecond timestamps and sorts chronologically.
+
+### 9. Clearing sort/filter
+❌ Assuming you must rebuild state to clear it.
+✅ `grid.clearSort()` / `grid.clearFilter()` (optionally per `key`).
+
+### 10. Expecting events from programmatic operations
 ❌ Listening for `sorting` after calling `grid.sort(...)` — never fires.
-✅ The UI-initiated path fires events; the programmatic path is silent. If you need a side-effect on every change, watch `grid.dataView` or wrap the call yourself.
-
-### 8. `sort: true` without setting `type`
-❌ Sorting numbers as strings: `{ key: 'age', sort: true }` with no `type`.
-✅ `{ key: 'age', type: 'number', sort: true }` — gets the correct comparer and filter operands.
-
-### 9. Looking for a `'date'` column type
-❌ `{ key: 'created', type: 'date' }` — there is no `'date'` type.
-✅ Store dates as numbers (timestamps) with `type: 'number'`, or as ISO strings with a custom `sort.comparer` and a `cellTemplate` that formats:
-```ts
-{
-  key: 'created',
-  type: 'string',
-  sort: { comparer: (a, b) => a.localeCompare(b) },
-  cellTemplate: ({ value }) => html`${new Date(value).toLocaleDateString()}`,
-}
-```
-
-### 10. Calling `clearSort()` to flush an empty array
-❌ `grid.sortExpressions = []` — the setter is a no-op for empty arrays.
-✅ `grid.clearSort()`.
-
-### 11. Querying all rows
-❌ `grid.rows.length === grid.data.length` — false; rows are virtualized.
-✅ Use `grid.totalItems` for the post-pipeline count, or `grid.dataView` for the post-pipeline rows.
-
-### 12. Auto-generating after replacing data
-❌ `grid.data = newData` with `autoGenerate: true` and existing columns — the old columns persist.
-✅ Reset first: `grid.columns = []; grid.data = newData;`.
-
-### 13. Mixing operand keys across types
-❌ `grid.filter({ key: 'age' /* number */, condition: 'contains' /* string operand */ })` — runtime error.
-✅ Match the operand to the column type (or import the typed operand: `NumberOperands.greaterThan`).
-
-### 14. Rendering before `register()` in the same task
-❌ Stamping `<apex-grid>` before the registration import has resolved — the element is upgraded later but properties set before upgrade may be lost.
-✅ Import `'apex-grid/define'` at the top of your entry file, then render.
+✅ Wrap the programmatic call yourself, or watch `grid.dataView` for any state change.
 
 ---
 
-## 9. Reference Routing Table
+## 7. Reference Routing Table
 
 | Topic | Reference File |
 |---|---|
-| Column configuration, types, templates, auto-generation | `references/columns-and-templates.md` |
-| Sort & filter — UI events, programmatic API, expressions, operands | `references/sort-and-filter.md` |
-| Server-side data pipeline, async hooks, virtualization notes | `references/data-pipeline.md` |
-| Framework integration — Lit, React, Vue, Angular | `references/framework-integration.md` |
+| Column types, templates, auto-generation, per-column styling, header/editor templates | `references/columns-and-templates.md` |
+| Sort & filter — operands, expressions, multi-column, quick-filter, events | `references/sort-and-filter.md` |
+| Server-side data hooks (sort/filter/pagination/quickFilter), virtualization, `dataView` | `references/data-pipeline.md` |
+| End-to-end vanilla JS (no Lit `render`) | `references/vanilla-js.md` |
+| Lit, React, Vue, Angular integration | `references/framework-integration.md` |

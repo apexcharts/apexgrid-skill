@@ -1,13 +1,46 @@
 # Framework Integration — Lit, React, Vue, Angular
 
-`apex-grid` is a standard custom element with no first-party framework wrappers. Every framework consumes it the same way: register the tag once, then bind `data` and `columns` as **properties** (not attributes) and listen for `sorting` / `sorted` / `filtering` / `filtered` events.
+`apex-grid` is a standard custom element with no first-party framework wrappers. Every framework consumes it the same way:
 
-## Lit (recommended)
+1. **Register the element + size the host once at app startup** — `setup()` does both (registers `<apex-grid>` and adopts a bounded host height). No theme CSS import is needed; the grid self-styles via `--ag-*` variables.
+2. **Bind `data` and `columns` as properties** (not attributes).
+3. **Listen for `sorting` / `sorted` / `filtering` / `filtered` (and the other UI) events** as standard DOM events.
 
-The most natural host — Lit `html` templates already understand the `.property` and `@event` binding syntax.
+The `setup()` call ideally lives in your application entry file (`main.ts` / `main.js` / `app.module.ts`) so it runs once, not per component.
+
+---
+
+## App-entry setup (all frameworks)
+
+Put this at the top of your application entry point — `src/main.ts` for Vite/Lit/Vue, `src/index.tsx` for React, `src/main.ts` for Angular:
 
 ```ts
-import 'apex-grid/define';
+import { setup } from 'apex-grid';
+setup();                         // registers <apex-grid> + adopts a bounded host height
+```
+
+No theme import needed — the grid self-styles. Retheme by overriding `--ag-*` CSS variables on `apex-grid`. If you prefer manual control over sizing, call `setup({ hostStyles: false })` (or use `import 'apex-grid/define'`) and add your own rule:
+
+```css
+apex-grid {
+  height: 480px;     /* or whatever fits your layout; + any --ag-* overrides */
+}
+```
+
+The framework examples below assume this app-entry setup is already done.
+
+---
+
+## Lit
+
+The most natural host — Lit `html` templates already understand `.property` and `@event` binding syntax.
+
+```ts
+// src/main.ts — done once
+import { setup } from 'apex-grid';
+setup();
+
+// component
 import { html, render } from 'lit';
 import type { ColumnConfiguration } from 'apex-grid';
 
@@ -15,11 +48,11 @@ type User = { id: number; name: string; age: number; subscribed: boolean };
 
 const data: User[] = [/* … */];
 const columns: ColumnConfiguration<User>[] = [
-  { key: 'id', type: 'number', sort: true, filter: true },
-  { key: 'name', type: 'string', sort: true, filter: true,
+  { key: 'id',         type: 'number',  width: '80px',  sort: true, filter: true },
+  { key: 'name',       type: 'string',  width: '240px', sort: true, filter: true,
     cellTemplate: ({ value }) => html`<strong>${value}</strong>` },
-  { key: 'age', type: 'number', sort: true, filter: true },
-  { key: 'subscribed', type: 'boolean', sort: true, filter: true },
+  { key: 'age',        type: 'number',  width: '100px', sort: true, filter: true },
+  { key: 'subscribed', type: 'boolean', width: '140px', sort: true, filter: true },
 ];
 
 render(
@@ -33,15 +66,16 @@ render(
 );
 ```
 
+---
+
 ## React
 
-React 19+ supports custom elements natively, including property binding via `ref` for non-string values. For broad compatibility, use a `useEffect` + `ref` pattern:
+React 19+ supports custom elements natively, including property binding for non-string values. For broad compatibility, use `ref` + `useEffect`:
 
 ```tsx
 import { useEffect, useRef } from 'react';
-import 'apex-grid/define';
+import { html } from 'lit';                              // required for cellTemplate
 import type { ApexGrid, ColumnConfiguration } from 'apex-grid';
-import { html } from 'lit';
 
 type User = { id: number; name: string; age: number; subscribed: boolean };
 
@@ -53,11 +87,11 @@ export function UsersGrid({ data }: { data: User[] }) {
     if (!grid) return;
 
     grid.columns = [
-      { key: 'id',         type: 'number',  sort: true, filter: true },
-      { key: 'name',       type: 'string',  sort: true, filter: true,
+      { key: 'id',         type: 'number',  width: '80px',  sort: true, filter: true },
+      { key: 'name',       type: 'string',  width: '240px', sort: true, filter: true,
         cellTemplate: ({ value }) => html`<strong>${value}</strong>` },
-      { key: 'age',        type: 'number',  sort: true, filter: true },
-      { key: 'subscribed', type: 'boolean', sort: true, filter: true },
+      { key: 'age',        type: 'number',  width: '100px', sort: true, filter: true },
+      { key: 'subscribed', type: 'boolean', width: '140px', sort: true, filter: true },
     ];
 
     const onSorted = (e: Event) => console.log('sorted', (e as CustomEvent).detail);
@@ -65,20 +99,22 @@ export function UsersGrid({ data }: { data: User[] }) {
     return () => grid.removeEventListener('sorted', onSorted);
   }, []);
 
-  // Set data whenever it changes
   useEffect(() => {
-    if (ref.current) ref.current.data = data;
+    if (ref.current) ref.current.data = data;            // set property whenever data changes
   }, [data]);
 
+  // The global `apex-grid { height: ... }` CSS handles sizing.
   // @ts-expect-error — apex-grid is a custom element
-  return <apex-grid ref={ref} style={{ height: '500px', display: 'block' }} />;
+  return <apex-grid ref={ref} />;
 }
 ```
 
-For full TypeScript / JSX intrinsic-element support, declare:
+If you'd rather size per instance instead of globally, replace the global CSS rule with a `style` prop: `style={{ height: '500px', display: 'block' }}`.
+
+For full TypeScript / JSX intrinsic-element support:
 
 ```ts
-// apex-grid.d.ts
+// types/apex-grid.d.ts
 import type { ApexGrid } from 'apex-grid';
 
 declare module 'react' {
@@ -90,24 +126,31 @@ declare module 'react' {
 }
 ```
 
+---
+
 ## Vue 3
 
-Vue understands property binding for custom elements out of the box. Mark `apex-grid` as a custom element in the compiler config so Vue doesn't try to resolve it as a Vue component:
+### Vite plugin config
+
+Tell the Vue compiler that `apex-grid` is a custom element so it doesn't try to resolve it as a Vue component:
 
 ```ts
 // vite.config.ts
 export default defineConfig({
   plugins: [
-    vue({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('apex-') } } }),
+    vue({
+      template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('apex-') } },
+    }),
   ],
 });
 ```
 
+### Component
+
 ```vue
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import 'apex-grid/define';
-import { html } from 'lit';
+import { html } from 'lit';                              // required for cellTemplate
 import type { ApexGrid, ColumnConfiguration } from 'apex-grid';
 
 type User = { id: number; name: string; age: number; subscribed: boolean };
@@ -116,15 +159,15 @@ const grid = ref<ApexGrid<User> | null>(null);
 
 const data = ref<User[]>([/* … */]);
 const columns: ColumnConfiguration<User>[] = [
-  { key: 'id',         type: 'number',  sort: true, filter: true },
-  { key: 'name',       type: 'string',  sort: true, filter: true,
+  { key: 'id',         type: 'number',  width: '80px',  sort: true, filter: true },
+  { key: 'name',       type: 'string',  width: '240px', sort: true, filter: true,
     cellTemplate: ({ value }) => html`<strong>${value}</strong>` },
-  { key: 'age',        type: 'number',  sort: true, filter: true },
-  { key: 'subscribed', type: 'boolean', sort: true, filter: true },
+  { key: 'age',        type: 'number',  width: '100px', sort: true, filter: true },
+  { key: 'subscribed', type: 'boolean', width: '140px', sort: true, filter: true },
 ];
 
 onMounted(() => {
-  grid.value!.columns = columns;
+  grid.value!.columns = columns;                         // set as property after mount
 });
 
 function onSorted(e: CustomEvent) {
@@ -137,22 +180,21 @@ function onSorted(e: CustomEvent) {
     ref="grid"
     :data.prop="data"
     @sorted="onSorted"
-    style="height: 500px; display: block;"
   />
 </template>
 ```
 
-> Use `:data.prop="data"` (or set via `ref` in `onMounted`) to bind as a property. Vue's default `:data="data"` sets an attribute (a stringified object) which `apex-grid` will not read.
+> Use `:data.prop="data"` to bind as a property. Vue's default `:data="data"` sets an attribute, which becomes the literal string `"[object Object]"` and the grid renders nothing.
+
+---
 
 ## Angular
 
-Add `CUSTOM_ELEMENTS_SCHEMA` to the module / standalone component, then use property binding `[data]="..."` and event binding `(sorted)="..."`:
+Add `CUSTOM_ELEMENTS_SCHEMA` to the component (or module). Use `[data]="..."` for property binding and `(sorted)="..."` for events:
 
 ```ts
-// app.component.ts
 import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, ViewChild, ElementRef } from '@angular/core';
-import 'apex-grid/define';
-import { html } from 'lit';
+import { html } from 'lit';                              // required for cellTemplate
 import type { ApexGrid, ColumnConfiguration } from 'apex-grid';
 
 type User = { id: number; name: string; age: number; subscribed: boolean };
@@ -165,9 +207,8 @@ type User = { id: number; name: string; age: number; subscribed: boolean };
     <apex-grid
       #grid
       [data]="data"
-      (sorted)="onSorted($event)"
-      style="height: 500px; display: block;"
-    ></apex-grid>
+      (sorted)="onSorted($event)">
+    </apex-grid>
   `,
 })
 export class UsersGridComponent implements OnInit {
@@ -177,11 +218,11 @@ export class UsersGridComponent implements OnInit {
 
   ngOnInit() {
     this.grid.nativeElement.columns = [
-      { key: 'id',         type: 'number',  sort: true, filter: true },
-      { key: 'name',       type: 'string',  sort: true, filter: true,
+      { key: 'id',         type: 'number',  width: '80px',  sort: true, filter: true },
+      { key: 'name',       type: 'string',  width: '240px', sort: true, filter: true,
         cellTemplate: ({ value }) => html`<strong>${value}</strong>` },
-      { key: 'age',        type: 'number',  sort: true, filter: true },
-      { key: 'subscribed', type: 'boolean', sort: true, filter: true },
+      { key: 'age',        type: 'number',  width: '100px', sort: true, filter: true },
+      { key: 'subscribed', type: 'boolean', width: '140px', sort: true, filter: true },
     ];
   }
 
@@ -191,13 +232,17 @@ export class UsersGridComponent implements OnInit {
 }
 ```
 
+---
+
 ## Common pitfalls across frameworks
 
 | ❌ | ✅ |
 |---|---|
-| Vue: `:data="data"` (attribute, becomes `"[object Object]"`) | `:data.prop="data"` or set via `ref` in `onMounted` |
-| React: `<apex-grid columns={[...]}>` before React 19 (passes as attribute) | Use `ref` + `useEffect` to set as property, or React 19+ |
+| Forgetting to register the element | Top-level `import 'apex-grid/define'` once in the app entry |
+| Importing an Ignite UI theme + `configureTheme(name)` | Obsolete — the grid self-styles; retheme via `--ag-*` CSS variables. No import does anything for appearance |
+| Forgetting `setup()` / no host-height rule for `apex-grid` | `setup()` registers + sizes the host. Or `import 'apex-grid/define'` + `apex-grid { height: ... }` (never set `display` — it overrides the component's `:host { display: grid }`) |
+| Vue: `:data="data"` (attribute, becomes `"[object Object]"`) | `:data.prop="data"`, or set via `ref` in `onMounted` |
+| React: `<apex-grid columns={[...]}>` before React 19 | Use `ref` + `useEffect` to set as property |
 | Angular: missing `CUSTOM_ELEMENTS_SCHEMA` | Add to the component / module schemas |
-| All: forgetting to register the element | Top-level `import 'apex-grid/define'` once |
-| Lit: writing string templates instead of `html` literals | Always import `html` from `lit` and use tagged literals |
-| Treating `cellTemplate` as framework-specific JSX | Always use Lit `html\`...\`` — the template runs inside the web component, not in the host framework |
+| Writing string templates for cells | Always `import { html } from 'lit'` and use `html\`...\`` tagged literals |
+| Treating `cellTemplate` as framework-specific JSX | The template runs inside the web component — only Lit `html` works |

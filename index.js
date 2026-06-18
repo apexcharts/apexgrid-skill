@@ -17,6 +17,7 @@ export const referenceFiles = [
   'data-pipeline.md',
   'framework-integration.md',
   'sort-and-filter.md',
+  'vanilla-js.md',
 ];
 
 /** Resolve a reference file by its filename. Throws if not in the known list. */

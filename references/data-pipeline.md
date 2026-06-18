@@ -2,24 +2,29 @@
 
 ## How the pipeline runs
 
-When `data`, `columns`, sort state, or filter state changes, Apex Grid runs an async pipeline:
+When `data`, `columns`, sort state, filter state, the quick-filter value, or the page changes, Apex Grid runs an async pipeline:
 
 ```
-data ─► (filter) ─► (sort) ─► dataState ─► virtualizer ─► rendered rows
+data ─► (quickFilter) ─► (filter) ─► (sort) ─► (pagination) ─► virtualizer ─► rendered rows
 ```
 
-By default both stages run in-memory. Override either stage (or both) with `dataPipelineConfiguration`.
+By default every stage runs in-memory. Override any stage with `dataPipelineConfiguration`.
 
 ## `dataPipelineConfiguration`
 
 ```ts
+type DataPipelineParams<T> = { data: T[]; grid: ApexGrid<T>; type: 'sort' | 'filter' | 'quickFilter' | 'pagination' };
+type DataPipelineHook<T>   = (state: DataPipelineParams<T>) => T[] | Promise<T[]>;
+
 interface DataPipelineConfiguration<T extends object> {
-  sort?:   (state: { data: T[]; grid: ApexGrid<T>; type: 'sort'   }) => T[] | Promise<T[]>;
-  filter?: (state: { data: T[]; grid: ApexGrid<T>; type: 'filter' }) => T[] | Promise<T[]>;
+  sort?:        DataPipelineHook<T>;
+  filter?:      DataPipelineHook<T>;   // column filters
+  quickFilter?: DataPipelineHook<T>;   // global search (runs before column filter)
+  pagination?:  DataPipelineHook<T>;   // return the page slice; remote: set pagination.totalItems
 }
 ```
 
-The grid invokes the matching hook in place of its built-in pipeline stage. Whatever the hook returns becomes the new `dataState` for the next stage (or the final view).
+The grid invokes the matching hook in place of its built-in pipeline stage. Whatever the hook returns becomes the input for the next stage (or the final view). All four hooks are optional — omit a stage to keep it in-memory.
 
 ```ts
 grid.dataPipelineConfiguration = {
@@ -57,7 +62,7 @@ grid.dataPipelineConfiguration = {
 
 ### Order of operations
 
-The grid runs **filter first, then sort** — and that ordering is fixed. If your server endpoint sorts and filters together, do both in the `filter` hook (returning the fully sorted+filtered array) and skip the `sort` hook.
+The grid runs the stages in a fixed order: **quick-filter → column filter → sort → pagination**. If your server endpoint does several of these together, do the work in the earliest relevant hook (returning the fully processed array) and omit the later hooks. For server-driven paging, return the current page from the `pagination` hook and set `grid.pagination = { ..., mode: 'remote', totalItems }` so the paginator can compute the page count.
 
 ### Hooks fire on every state change
 

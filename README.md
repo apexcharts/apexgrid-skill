@@ -10,12 +10,16 @@ AI models routinely get web-component grid code wrong: they treat `<apex-grid>` 
 
 ### Coverage
 
-- **Custom-element registration** — `import 'apex-grid/define'` vs `ApexGrid.register()`
-- **Generic `ColumnConfiguration<T>`** — `key`, `type`, templates, `sort`, `filter`
-- **Lit cell & header templates** with the right context shapes
-- **Sort & filter** — programmatic API, UI events, operands, multi-column
-- **Server-side data** — `dataPipelineConfiguration` async hooks
+- **Quickstart** — register + size the host (`setup()` does both); no theme import — the grid self-styles via `--ag-*` CSS variables
+- **Custom-element registration** — `setup()`, `import 'apex-grid/define'`, or `ApexGrid.register()`
+- **Generic `ColumnConfiguration<T>`** — `key`, the 13 column `type`s (incl. `date`, `select`, `currency`, …), templates, `sort`, `filter`, `pinned`, explicit widths
+- **Lit cell, header & editor templates** with the right context shapes
+- **Sort, filter & quick-filter** — programmatic API, UI events, operands, multi-column
+- **Editing, selection, pagination, tree & master-detail** — the opt-in feature config objects
+- **Server-side data** — `dataPipelineConfiguration` async hooks (sort/filter/pagination/quickFilter)
+- **CSV export & column reordering/pinning**
 - **Virtualization** — `grid.rows` vs `grid.dataView` vs `grid.totalItems`
+- **Vanilla JS** — full setup without using Lit's `render()` in app code
 - **Framework integration** — Lit, React, Vue, Angular
 
 ## Installation
@@ -58,9 +62,10 @@ const cols  = await readFile(referencePath('columns-and-templates.md'), 'utf8');
 ├── SKILL.md                           # Main entry point
 ├── .cursorrules                       # Self-contained Cursor / Windsurf version
 ├── references/
-│   ├── columns-and-templates.md       # ColumnConfiguration, types, Lit templates
+│   ├── columns-and-templates.md       # ColumnConfiguration, types, Lit templates, widths
 │   ├── sort-and-filter.md             # operands, expressions, events, multi-column
 │   ├── data-pipeline.md               # async hooks, server-side, virtualization
+│   ├── vanilla-js.md                  # full setup without Lit render() in app code
 │   └── framework-integration.md       # Lit, React, Vue, Angular
 └── install/
     ├── claude-code.md
@@ -73,7 +78,7 @@ const cols  = await readFile(referencePath('columns-and-templates.md'), 'utf8');
 - [apex-grid GitHub](https://github.com/apexcharts/apexgrid)
 - [npm: apex-grid](https://www.npmjs.com/package/apex-grid)
 - [Lit framework](https://lit.dev)
-- [igniteui-webcomponents](https://www.npmjs.com/package/igniteui-webcomponents) (runtime peer)
+- [igniteui-webcomponents](https://www.npmjs.com/package/igniteui-webcomponents) (transitive dep — installs automatically)
 
 ## License
 
