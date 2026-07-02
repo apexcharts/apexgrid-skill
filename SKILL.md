@@ -12,8 +12,8 @@ description: >
   model, and the `dataPipelineConfiguration` hooks for server-side data.
 metadata:
   author: ApexCharts
-  version: "2.0.0"
-  library_version: "3.0.1"
+  version: "2.1.0"
+  library_version: "3.3.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -165,9 +165,11 @@ interface ColumnConfiguration<T extends object, K extends keyof T = keyof T> {
   pinned?: 'start' | 'end' | null;         // freeze to a side during horizontal scroll
   reorderable?: boolean;                   // per-column opt-out of drag reorder
   exportable?: boolean;                    // default true; false omits from CSV export
+  group?: string;                          // id of a columnGroups spanning header (§5)
   sort?:   boolean | { caseSensitive?: boolean; comparer?: (a: T[K], b: T[K]) => number };
   filter?: boolean | { caseSensitive?: boolean };
   editable?: boolean;                      // requires grid `editing.enabled`
+  validators?: Validator<T, K>[];          // declarative edit-time validation (§5)
   headerTemplate?:  (ctx: ApexHeaderContext<T>) => TemplateResult | unknown;
   cellTemplate?:    (ctx: ApexCellContext<T, K>) => TemplateResult | unknown;
   editorTemplate?:  (ctx: ApexEditorContext<T, K>) => TemplateResult | unknown;
@@ -276,6 +278,16 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 | `quickFilter` (attr `quick-filter`) | `string` | Global substring search across visible columns. |
 | `showQuickFilter` / `showExport` | `boolean` | Toolbar UI toggles for quick-filter input / export menu. |
 | `columnReordering` (attr `column-reordering`) | `boolean` | Drag-reorder headers; per-column opt-out via `reorderable`. |
+| `columnMenu` | `boolean` | Header kebab-menu button. Default `true`; set `false` to hide. |
+| `columnSeparator` (attr `column-separator`) | `boolean` | Persistent header dividers (also the resize handle). Default `true`; theme via `--ag-header-separator`. |
+| `columnGroups` | `ColumnGroupConfiguration[]` | Spanning headers over contiguous columns (join via `column.group`). See `references/state-and-features.md`. |
+| `localeText` | `GridLocaleText` | Partial locale-key → string overrides; ready-made `esLocale` export. Omitted keys fall back to English. |
+| `rowId` | `(row: T) => string \| number` | Stable row-identity resolver so `getState` selection/expansion survives a data reload. |
+| `displayColumns` *(getter)* | `readonly ColumnConfiguration<T>[]` | Columns in visual render order (start-pinned → unpinned → end-pinned). |
+| `hasColumnGroups` / `columnGroupDepth` *(getters)* | `boolean` / `number` | Whether a group header row renders / its depth (0–1). |
+| `pinnedRows` *(getter)* | `{ top: T[]; bottom: T[] }` | Currently pinned rows per band. |
+| `canUndo` / `canRedo` *(getters)* | `boolean` | Undo/redo availability (needs `editing.history.enabled`). |
+| `exportFormats` *(getter)* | `readonly { id, label }[]` | Export menu formats (CSV in the community grid). |
 | `sortExpressions` / `filterExpressions` | `…[]` (get/set) | Current state. To clear, use `clearSort()` / `clearFilter()`. |
 | `selectedRows` / `expandedRows` | `T[]` (get/set) | Snapshots; set to replace (goes through cancellable events). |
 | `rows` *(getter)* | `ApexGridRow<T>[]` | **Currently rendered only** (virtualized). |
@@ -288,17 +300,23 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 
 | Property | Shape |
 |---|---|
-| `editing` | `{ enabled, mode?: 'cell' \| 'row', trigger?: 'click' \| 'doubleClick' }` — plus per-column `editable: true` |
+| `editing` | `{ enabled, mode?: 'cell' \| 'row', trigger?: 'click' \| 'doubleClick', history?: { enabled, stackSize? } }` — plus per-column `editable: true` |
 | `selection` | `{ enabled, mode?: 'single' \| 'multiple', showCheckboxColumn? }` |
 | `pagination` | `{ enabled, mode?: 'local' \| 'remote', page?, pageSize?, pageSizeOptions?, totalItems? }` |
 | `tree` | `{ enabled, getDataPath: (row) => string[], groupColumnKey?, defaultExpanded?, childIndent? }` — flat data, hierarchy derived |
 | `expansion` | `{ enabled, detailTemplate: (ctx) => TemplateResult, isExpandable?, showToggleColumn? }` — master-detail |
+| `rowPinning` | `{ enabled }` — sticky top/bottom bands via `pinRow()` / `unpinRow()` |
+| `rowReordering` | `{ enabled, applyToData?, handle? }` — drag/keyboard reorder + `moveRow()`; manual order is mutually exclusive with sort |
 
 ```ts
-grid.editing    = { enabled: true, mode: 'cell', trigger: 'doubleClick' };
+grid.editing    = { enabled: true, mode: 'cell', trigger: 'doubleClick', history: { enabled: true } };
 grid.selection  = { enabled: true, mode: 'multiple', showCheckboxColumn: true };
 grid.pagination = { enabled: true, pageSize: 25 };
+grid.rowPinning    = { enabled: true };
+grid.rowReordering = { enabled: true };
 ```
+
+Declarative validators (`column.validators`), column groups (`columnGroups`), undo/redo, and state persistence (`getState` / `setState` / `getSchema`) are covered in `references/state-and-features.md`.
 
 ### Methods
 
@@ -309,11 +327,18 @@ grid.pagination = { enabled: true, pageSize: 25 };
 | `getColumn(keyOrIndex)` | Find a column. |
 | `updateColumns(col \| col[])` | Merge new fields into existing columns by `key`. Triggers a pipeline run. |
 | `moveColumn(fromKey, toKey, position?)` | Reorder a column (within its pinning group). |
-| `exportToCSV(options?)` / `exportAs(formatId, options?)` | Export the data. CSV is built in. |
+| `pinColumn(key, 'start' \| 'end' \| null)` / `unpinColumn(key)` | Programmatic column pinning → `Promise<boolean>`; emits `columnPinning`/`columnPinned`. |
+| `exportToCSV(options?)` / `exportAs(formatId, options?)` | Export the data. CSV is built in. `options.source`: `'view'`(def)/`'page'`/`'selected'`/`'all'`. |
+| pagination | `gotoPage(n)`, `setPageSize(n)`, `nextPage()`, `previousPage()`, `firstPage()`, `lastPage()` → `Promise<boolean>`; emit `pageChanging`/`pageChanged`. |
+| `setQuickFilter(value)` | Apply global search (`''` clears) → `Promise<boolean>`; emits `quickFilterChanging`/`quickFilterChanged`. |
 | selection | `selectRow`, `deselectRow`, `toggleRowSelection`, `selectAllRows`, `clearSelection`, `isRowSelected` |
 | expansion | `expandRow`, `collapseRow`, `toggleRowExpansion`, `expandAllRows`, `collapseAllRows`, `isRowExpanded` |
 | tree | `expandTreeRow`, `collapseTreeRow`, `toggleTreeRow`, `expandAllTreeRows`, `collapseAllTreeRows`, `isTreeRowExpanded` |
+| row pinning | `pinRow(row, 'top' \| 'bottom')`, `unpinRow(row)` (needs `rowPinning.enabled`) |
+| row reorder | `moveRow(from, to, position?)` (needs `rowReordering.enabled`) |
 | editing | `commitEdit()`, `cancelEdit()` (used with `mode: 'row'`) |
+| undo/redo | `undo()`, `redo()`, `clearHistory()` (needs `editing.history.enabled`) |
+| state | `getState(options?)` → `GridState`, `setState(partial, options?)` → `SetStateResult`, `getSchema()` → `GridSchema` |
 | `ApexGrid.register()` / `ApexGrid.tagName` | Static element registration / `'apex-grid'`. |
 
 ### Events — UI-initiated only
@@ -333,8 +358,20 @@ Every event fires only for operations driven through the grid's own UI; programm
 | `rowSelecting` / `rowSelected` | row selection |
 | `rowExpanding` / `rowExpanded` | master-detail expand |
 | `treeRowExpanding` / `treeRowExpanded` | tree-row expand |
+| `rowPinning` / `rowPinned` | row pin / unpin (also fires for `pinRow()`/`unpinRow()`) |
+| `rowMoving` / `rowMoved` | row reorder (also fires for `moveRow()`) |
 
-Operand reference, multi-column sort, and server-side hooks: `references/sort-and-filter.md` and `references/data-pipeline.md`.
+**Exceptions to "UI-only".** The dedicated programmatic methods added for pagination (`gotoPage`, `nextPage`, …), quick-filter (`setQuickFilter`), column pinning (`pinColumn` / `unpinColumn`), row pinning (`pinRow` / `unpinRow`), and row reorder (`moveRow`) **do** emit their `*-ing` / `*-ed` pairs (unlike `sort()` / `filter()`, which stay silent).
+
+Single-shot events (no `-ing` pair):
+
+| Event | `event.detail` | Fires when |
+|---|---|---|
+| `cellValidationFailed` | `{ key, rowIndex, data, value, errors: string[] }` | a candidate value is rejected by `column.validators` (keeps editor open) |
+| `historyChanged` | `{ canUndo, canRedo }` | undo/redo stacks change (record / undo / redo / clear) |
+| `stateChanged` | `{ state: GridState }` | restorable state changes (debounced; UI or programmatic incl. `setState`) |
+
+Operand reference, multi-column sort, and server-side hooks: `references/sort-and-filter.md` and `references/data-pipeline.md`. Row pinning/reorder, undo/redo, validators, column groups, state/schema, and localization: `references/state-and-features.md`.
 
 ---
 
@@ -389,5 +426,6 @@ Operand reference, multi-column sort, and server-side hooks: `references/sort-an
 | Column types, templates, auto-generation, per-column styling, header/editor templates | `references/columns-and-templates.md` |
 | Sort & filter — operands, expressions, multi-column, quick-filter, events | `references/sort-and-filter.md` |
 | Server-side data hooks (sort/filter/pagination/quickFilter), virtualization, `dataView` | `references/data-pipeline.md` |
+| Row pinning / reordering, undo-redo, validators, column groups, state & schema (`getState`/`setState`/`getSchema`), localization, export source | `references/state-and-features.md` |
 | End-to-end vanilla JS (no Lit `render`) | `references/vanilla-js.md` |
 | Lit, React, Vue, Angular integration | `references/framework-integration.md` |

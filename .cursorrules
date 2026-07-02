@@ -109,6 +109,8 @@ interface ColumnConfiguration<T, K extends keyof T> {
   reorderable?: boolean;                         // per-column opt-out of drag reorder
   exportable?: boolean;                          // default true
   editable?: boolean;                            // requires grid editing.enabled
+  group?: string;                                // id of a columnGroups spanning header
+  validators?: Validator<T, K>[];                // edit-time validation (3.2+)
   sort?:   boolean | { caseSensitive?, comparer? };
   filter?: boolean | { caseSensitive? };
   headerTemplate?: (ctx) => TemplateResult;
@@ -258,6 +260,21 @@ Built-in pipeline is skipped for whichever operations have a hook. Omit one to k
 ### 11. Wrong package name
 ❌ `import ... from 'apexgrid'` — no such package.
 ✅ `import ... from 'apex-grid'`.
+
+---
+
+## New in 3.1–3.3
+
+- **Row pinning**: `rowPinning = { enabled }`, `pinRow(row, 'top'|'bottom')`/`unpinRow(row)`, `pinnedRows` getter, `rowPinning`/`rowPinned` events.
+- **Row reordering**: `rowReordering = { enabled, applyToData?, handle? }`, `moveRow(from, to, position?)`, `rowMoving`/`rowMoved` events (clears on sort).
+- **Inline-edit undo/redo**: `editing.history = { enabled, stackSize? }`, `undo()`/`redo()`/`clearHistory()`, `canUndo`/`canRedo`, `historyChanged` event.
+- **Validators**: `column.validators: Validator[]` + `required`/`min`/`max`/`pattern`/`custom` factories, `cellValidationFailed` event.
+- **Column groups**: `columnGroups = [{ id, headerText }]` + `column.group` (members contiguous within a pin region).
+- **State/schema**: `getState()`/`setState()`/`getSchema()`, `rowId`, `stateChanged` event (`setState` is partial + defensive).
+- **Programmatic (these DO emit events, unlike sort/filter)**: `gotoPage`/`nextPage`/`setPageSize`/…, `setQuickFilter()`, `pinColumn`/`unpinColumn`.
+- **Localization**: `localeText` (`GridLocaleText`), `localize()`, `esLocale` export.
+- **Misc**: `columnMenu`/`columnSeparator`; `exportToCSV`/`exportAs` `source: 'view'|'page'|'selected'|'all'`.
+- Full detail: `references/state-and-features.md`.
 
 ---
 

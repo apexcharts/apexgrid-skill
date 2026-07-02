@@ -21,7 +21,9 @@ interface BaseColumnConfiguration<T extends object, K extends keyof T = keyof T>
   pinned?: 'start' | 'end' | null;                 // freeze to a side during horizontal scroll
   reorderable?: boolean;                           // per-column opt-out of drag reorder
   exportable?: boolean;                            // default true; false omits from CSV export
+  group?: string;                                  // id of a columnGroups spanning header (state-and-features.md)
   editable?: boolean;                              // requires grid editing.enabled
+  validators?: Validator<T, K>[];                  // edit-time validation (see below)
   sort?: boolean | { caseSensitive?: boolean; comparer?: (a: T[K], b: T[K]) => number };
   filter?: boolean | { caseSensitive?: boolean };
   headerTemplate?: (ctx: ApexHeaderContext<T>) => TemplateResult | unknown;
@@ -155,6 +157,21 @@ interface ApexHeaderContext<T> {
     </span>`,
 }
 ```
+
+## Column validators (`validators`) — 3.2+
+
+`column.validators` run before a candidate value is written (inline edit, row-mode, and bulk paste / fill). Each returns an error `string` (reject) or `null` (pass); all run and every message is collected. A failing commit keeps the editor open, marks the cell `aria-invalid`, and emits `cellValidationFailed`. Requires the column to be `editable` and grid `editing.enabled`.
+
+```ts
+import { required, min, max, pattern, custom } from 'apex-grid';
+
+{ key: 'age', type: 'number', editable: true, validators: [required(), min(0), max(120)] }
+{ key: 'email', editable: true, validators: [pattern(/^\S+@\S+$/, 'Invalid email')] }
+{ key: 'code', editable: true,
+  validators: [custom((value, ctx) => (value === ctx.data.id ? 'Cannot equal id' : null))] }
+```
+
+Built-in factories: `required(message?)`, `min(limit, message?)`, `max(limit, message?)`, `pattern(regex, message?)`, `custom(fn)`. `min`/`max`/`pattern` pass on empty / non-numeric values — compose with `required`. See `references/state-and-features.md` for the `Validator` / `ValidatorContext` shapes and the `cellValidationFailed` payload.
 
 ## Auto-generation — the fastest demo
 

@@ -17,6 +17,7 @@ export const referenceFiles = [
   'data-pipeline.md',
   'framework-integration.md',
   'sort-and-filter.md',
+  'state-and-features.md',
   'vanilla-js.md',
 ];
 
