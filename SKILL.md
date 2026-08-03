@@ -12,8 +12,8 @@ description: >
   model, and the `dataPipelineConfiguration` hooks for server-side data.
 metadata:
   author: ApexCharts
-  version: "2.1.0"
-  library_version: "3.3.0"
+  version: "2.2.0"
+  library_version: "3.4.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -372,6 +372,24 @@ Single-shot events (no `-ing` pair):
 | `stateChanged` | `{ state: GridState }` | restorable state changes (debounced; UI or programmatic incl. `setState`) |
 
 Operand reference, multi-column sort, and server-side hooks: `references/sort-and-filter.md` and `references/data-pipeline.md`. Row pinning/reorder, undo/redo, validators, column groups, state/schema, and localization: `references/state-and-features.md`.
+
+### Keyboard & accessibility (3.4)
+
+The grid ships full keyboard operation and screen-reader support out of the box; there's nothing to enable. The body uses a **roving-tabindex** focus model: the active cell is the body's single tab stop, so `Tab` moves into and out of the grid in one step, and real focus follows arrow-key navigation (screen readers track cell-to-cell movement).
+
+| Key | Moves / does |
+|---|---|
+| Arrow keys | Move the active cell one cell up / down / left / right |
+| Home / End | Move to the **first / last cell of the current row** |
+| Ctrl/Cmd+Home / Ctrl/Cmd+End | Jump to the grid's first / last cell |
+| PageUp / PageDown | Page-scroll by a viewport |
+| Enter or F2 | Open the active cell's editor (editing is no longer pointer-only) |
+
+Keyboard-driven commit (Enter) or cancel (Escape) returns focus to the cell, so navigation continues from where you left off.
+
+**Editing behavior:** clearing a `number` or `currency` editor now commits `null` (previously it wrote `NaN`). An empty or unparseable numeric input leaves the cell empty rather than poisoning the row.
+
+**Announcements:** sorting, filtering, selection, paging, row pinning, row reorder, expansion, and undo / redo each announce through a localized live region, and the host applies a localized `aria-label` ("Data grid") plus `aria-multiselectable` when multi-row selection is on. The strings are locale keys (`announce.*`, `header.*`, `grid.label`, `editor.rating`); override them via `localeText` (see `references/state-and-features.md`).
 
 ---
 

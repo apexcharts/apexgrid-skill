@@ -1,6 +1,6 @@
 # State, Localization & Interaction Features (3.1+)
 
-> Everything here landed in **apex-grid 3.1 – 3.3** on top of the 3.0 API. The setup rules from `SKILL.md` (register + bounded host height, no theme import) still apply. Row pinning / reordering, undo-redo, and validators are all **opt-in** via a config object — off by default.
+> Everything here landed in **apex-grid 3.1 – 3.4** on top of the 3.0 API. The setup rules from `SKILL.md` (register + bounded host height, no theme import) still apply. Row pinning / reordering, undo-redo, and validators are all **opt-in** via a config object — off by default.
 
 ## Row pinning — sticky top / bottom bands
 
@@ -171,6 +171,8 @@ grid.localize('pagination.summary', { start: 1, end: 25, total: 100 });   // res
 ```
 
 Exports: `EN_LOCALE` (the default dictionary / source of truth for keys), `esLocale` (ready-made Spanish), `interpolate` (`{token}` substitution), `localize`, and the types `GridLocaleKey` / `GridLocaleText` / `LocaleParams`. `grid.localize(key, params?, fallback?)` applies any `localeText` override over the English default and interpolates `{placeholder}` tokens; `fallback` covers keys outside the built-in set (e.g. a custom operand label).
+
+**3.4 key changes** (both English and Spanish): the accessibility work added live-region announcement keys (`announce.*`, e.g. `announce.sortedAscending`, `announce.page`, `announce.rowSelected`, `announce.undoOne`), header control / sort-state labels (`header.*`, e.g. `header.sortedAscending`, `header.filterColumn`, `header.columnMenu`), the host label `grid.label` ("Data grid"), and `editor.rating`. The `ai.noAdapter` key was **removed** (drop it from any `localeText` override you kept). `EN_LOCALE` remains the source of truth for the full, current key list.
 
 ## Column menu & column separator
 

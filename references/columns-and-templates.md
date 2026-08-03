@@ -173,6 +173,8 @@ import { required, min, max, pattern, custom } from 'apex-grid';
 
 Built-in factories: `required(message?)`, `min(limit, message?)`, `max(limit, message?)`, `pattern(regex, message?)`, `custom(fn)`. `min`/`max`/`pattern` pass on empty / non-numeric values — compose with `required`. See `references/state-and-features.md` for the `Validator` / `ValidatorContext` shapes and the `cellValidationFailed` payload.
 
+**Numeric editing (3.4):** clearing a `number` or `currency` editor now commits `null`, not `NaN`. An empty or unparseable numeric input leaves the cell empty instead of writing `NaN` into the row. Editing also opens from the keyboard now (Enter or F2 on the active cell), not only by pointer; see SKILL.md §5 for the full keyboard model. Separately, a spreadsheet-style error value (an object carrying a `#...` code, such as an enterprise formula engine's `#VALUE!`) renders as its code in typed `number` / `currency` columns rather than coercing to `NaN` and showing an empty cell.
+
 ## Auto-generation — the fastest demo
 
 The shortest possible "just show me a table" example:

@@ -1,6 +1,6 @@
 {
   "name": "apexgrid-skill",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "AI coding skill for the apex-grid web component — structured reference docs that help AI assistants (Claude, Cursor, Copilot, etc.) generate correct apex-grid code.",
   "keywords": [
     "apex-grid",
