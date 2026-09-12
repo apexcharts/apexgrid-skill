@@ -124,13 +124,15 @@ const columns: ColumnConfiguration<User>[] = [
       <input type="checkbox" .checked=${value} disabled />
       <small>${row.name}</small>` },
 
-  // Embedded igniteui-webcomponents control
-  { key: 'avatar',
-    cellTemplate: ({ value }) => html`<igc-avatar shape="circle" .src=${value}></igc-avatar>` },
+  // Prefer the built-in type over a template where one exists:
+  // `avatar` and `rating` are column types, no template needed.
+  { key: 'avatar', type: 'avatar' },
+  { key: 'satisfaction', type: 'rating' },
 
-  // Rating widget tied to data type
-  { key: 'satisfaction', type: 'number',
-    cellTemplate: ({ value }) => html`<igc-rating readonly .value=${value}></igc-rating>` },
+  // Any custom element works, but YOU must install and register it:
+  // the grid ships no third-party components (see SKILL.md §1.1).
+  { key: 'status',
+    cellTemplate: ({ value }) => html`<my-status-chip .value=${value}></my-status-chip>` },
 ];
 ```
 

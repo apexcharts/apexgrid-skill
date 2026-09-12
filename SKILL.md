@@ -13,7 +13,7 @@ description: >
   `dataPipelineConfiguration` hooks for server-side data.
 metadata:
   author: ApexCharts
-  version: "2.3.0"
+  version: "2.3.1"
   library_version: "3.5.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
@@ -34,9 +34,11 @@ The grid styles itself out of the box (borders, row separators, sort/filter UI) 
 npm install apex-grid lit
 ```
 
-`igniteui-webcomponents` is a regular (transitive) dependency — it installs automatically, and you do **not** import any theme CSS from it.
+That is the whole install. `apex-grid` brings its own runtime dependencies (`lit`, `@lit/context`, `@lit-labs/virtualizer`) and there is **no theme CSS to import** from anywhere.
 
-> Confirmed working versions: `apex-grid@3.0.1`, `lit@^3.0.0`.
+> **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly.
+
+> Confirmed working versions: `apex-grid@3.5.0`, `lit@^3.0.0`.
 
 ### 1.2 Register the element + size the host — `setup()` does both
 
@@ -73,7 +75,7 @@ apex-grid {
 }
 ```
 
-> The deprecated `theme` option (and `igniteui-webcomponents`' `configureTheme()`) does **not** change the grid's appearance — it only forwards to igniteui for apps that embed igniteui components alongside the grid. Omit it; use `--ag-*` variables instead.
+> The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables instead.
 
 ### 1.4 Minimal example — a styled, sortable, filterable table
 
@@ -422,7 +424,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 ✅ `setup()` (or `import 'apex-grid/define'`) once at app startup.
 
 ### 3. Importing a theme CSS that no longer exists
-❌ `import 'igniteui-webcomponents/themes/light/bootstrap.css'` + `configureTheme('bootstrap')` — obsolete; does not affect the grid.
+❌ `import 'igniteui-webcomponents/themes/light/bootstrap.css'` + `setup({ theme: 'bootstrap' })` is obsolete; it never affected the grid, and as of 3.5.0 the option is inert and that package is not even installed.
 ✅ Nothing to import — the grid styles itself; retheme via `--ag-*` CSS variables. The only required CSS is a host **height**.
 
 ### 4. Stringified `columns` attribute

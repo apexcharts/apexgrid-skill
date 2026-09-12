@@ -88,7 +88,6 @@ const cols  = await readFile(referencePath('columns-and-templates.md'), 'utf8');
 - [apex-grid GitHub](https://github.com/apexcharts/apexgrid)
 - [npm: apex-grid](https://www.npmjs.com/package/apex-grid)
 - [Lit framework](https://lit.dev)
-- [igniteui-webcomponents](https://www.npmjs.com/package/igniteui-webcomponents) (transitive dep — installs automatically)
 
 ## License
 
