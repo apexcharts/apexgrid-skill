@@ -52,6 +52,32 @@ grid.canUndo;  grid.canRedo;                    // getters (false unless history
 
 `stackSize` defaults to `100` (older commands evicted past the cap). Event: `historyChanged` — `CustomEvent<{ canUndo: boolean; canRedo: boolean }>`, fires after any record / undo / redo / clear (drive toolbar button enablement from it).
 
+## Batch edits: `applyEdits()` (3.5)
+
+Writes many cells as a single operation. Each write still goes through the same choke point interactive editing uses, so it emits the cancellable `cellValueChanging` and then `cellValueChanged`, and runs the column's validators. What differs from looping `editCell` + `commitEdit` is that the whole set lands as **one undo step and one pipeline run**: a thousand round-trips would otherwise mean a thousand undo entries and a thousand re-renders.
+
+```ts
+const tally = grid.applyEdits([
+  { rowIndex: 0, column: 'discount', value: 0 },
+  { rowIndex: 3, column: 'discount', value: 0 },
+]);
+// { applied: 2, unchanged: 0, invalid: 0, cancelled: 0, skipped: 0 }
+```
+
+`rowIndex` is **view-relative** and matches `grid.pageItems`, the same as `editCell`. Order is preserved, so a later edit to the same cell wins.
+
+It returns a per-outcome tally rather than a count, because "nothing changed" and "everything was rejected" are different answers:
+
+| Key | Means |
+|---|---|
+| `applied` | The value actually changed. |
+| `unchanged` | The cell already held that value. |
+| `invalid` | A `column.validators` rule rejected it. |
+| `cancelled` | A `cellValueChanging` listener called `preventDefault()`. |
+| `skipped` | Unknown column, `rowIndex` out of range, or a column the user could not edit either (editing off, not `editable`, or hidden). |
+
+Skipping rather than throwing means a partially stale batch still applies what it can. Needs `editing.enabled` and per-column `editable`, the same gate as interactive editing; without `editing.history.enabled` the batch simply is not recorded.
+
 ## Declarative column validators
 
 `column.validators: Validator[]` run **before** a candidate value is written. Each returns an error `string` (reject) or `null` (pass). All run and every message is collected, so one commit can surface multiple errors. A failing commit keeps the editor open, marks the cell `aria-invalid`, and emits `cellValidationFailed`. Covers bulk edits (paste / fill) too.

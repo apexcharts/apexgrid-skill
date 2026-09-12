@@ -8,12 +8,13 @@ description: >
   the grid styles itself via `--ag-*` CSS variables), the generic
   `ColumnConfiguration<T>` shape with its 13 column types, Lit `cellTemplate`
   requirements, sorting / filtering / quick-filter, pagination, inline editing,
-  row selection, master-detail and tree rows, CSV export, the UI-only event
-  model, and the `dataPipelineConfiguration` hooks for server-side data.
+  row selection, master-detail and tree rows, CSV export, batch writes via
+  `applyEdits`, right-to-left layout, the UI-only event model, and the
+  `dataPipelineConfiguration` hooks for server-side data.
 metadata:
   author: ApexCharts
-  version: "2.2.0"
-  library_version: "3.4.0"
+  version: "2.3.0"
+  library_version: "3.5.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -113,6 +114,8 @@ render(
 - **Smooth virtualized scrolling** — only ~20 `<apex-grid-row>` elements exist in the DOM at once, even with thousands of rows
 
 If rows don't render at all, it's almost always the host height (§1.2). If the grid looks bare, you don't need a theme import — check your `--ag-*` overrides aren't fighting the defaults.
+
+> One non-obvious case, fixed in **3.5.0**: a grid first laid out while it is off-screen (inside an iframe the host page has not sized yet, or below the fold on a page still settling) could render zero rows while reporting a correct row count and scroll height, and stay that way until something forced a re-render. On 3.5.0 and later the body detects this and re-measures itself. On earlier versions, reassign `grid.data = grid.data.slice()` once the layout settles.
 
 > **Dev-server reminder.** ES module imports need an HTTP server — opening via `file://` fails with CORS errors. Use Vite (`npm create vite@latest`), any static server, or your framework's dev server.
 
@@ -337,6 +340,7 @@ Declarative validators (`column.validators`), column groups (`columnGroups`), un
 | row pinning | `pinRow(row, 'top' \| 'bottom')`, `unpinRow(row)` (needs `rowPinning.enabled`) |
 | row reorder | `moveRow(from, to, position?)` (needs `rowReordering.enabled`) |
 | editing | `commitEdit()`, `cancelEdit()` (used with `mode: 'row'`) |
+| `applyEdits(edits)` | Write many cells as **one** operation: one undo step, one pipeline run. Returns a tally, not a count. (3.5) |
 | undo/redo | `undo()`, `redo()`, `clearHistory()` (needs `editing.history.enabled`) |
 | state | `getState(options?)` → `GridState`, `setState(partial, options?)` → `SetStateResult`, `getSchema()` → `GridSchema` |
 | `ApexGrid.register()` / `ApexGrid.tagName` | Static element registration / `'apex-grid'`. |
@@ -373,7 +377,7 @@ Single-shot events (no `-ing` pair):
 
 Operand reference, multi-column sort, and server-side hooks: `references/sort-and-filter.md` and `references/data-pipeline.md`. Row pinning/reorder, undo/redo, validators, column groups, state/schema, and localization: `references/state-and-features.md`.
 
-### Keyboard & accessibility (3.4)
+### Keyboard & accessibility (3.4, 3.5)
 
 The grid ships full keyboard operation and screen-reader support out of the box; there's nothing to enable. The body uses a **roving-tabindex** focus model: the active cell is the body's single tab stop, so `Tab` moves into and out of the grid in one step, and real focus follows arrow-key navigation (screen readers track cell-to-cell movement).
 
@@ -390,6 +394,20 @@ Keyboard-driven commit (Enter) or cancel (Escape) returns focus to the cell, so 
 **Editing behavior:** clearing a `number` or `currency` editor now commits `null` (previously it wrote `NaN`). An empty or unparseable numeric input leaves the cell empty rather than poisoning the row.
 
 **Announcements:** sorting, filtering, selection, paging, row pinning, row reorder, expansion, and undo / redo each announce through a localized live region, and the host applies a localized `aria-label` ("Data grid") plus `aria-multiselectable` when multi-row selection is on. The strings are locale keys (`announce.*`, `header.*`, `grid.label`, `editor.rating`); override them via `localeText` (see `references/state-and-features.md`).
+
+**New in 3.5, all automatic:** the grid honours `prefers-reduced-motion` (every transition routes through the `--ag-dur-*` tokens, which zero under the media query), it stays usable under forced colors / Windows High Contrast (the active-cell ring, invalid-cell ring, selected-row bar and focus rings are painted as outlines, which forced colors recolours rather than drops), and interactive targets meet the WCAG 2.2 AA 24x24 minimum. The only visible change is that the paginator bar is 2px taller.
+
+### Right-to-left (3.5)
+
+Set `dir="rtl"` on the grid or any ancestor and it mirrors completely. There is no property to set and nothing to import: direction is read from the computed style, so an inherited `dir` works.
+
+```html
+<html dir="rtl">
+  <apex-grid></apex-grid>   <!-- inherits; no grid-level config -->
+</html>
+```
+
+Arrow-key navigation, column resize and column reorder all follow inline order rather than screen direction, so ArrowLeft moves to the *next* column in RTL. Column pinning `'start'` / `'end'` were already logical and are unchanged.
 
 ---
 
@@ -444,6 +462,6 @@ Keyboard-driven commit (Enter) or cancel (Escape) returns focus to the cell, so 
 | Column types, templates, auto-generation, per-column styling, header/editor templates | `references/columns-and-templates.md` |
 | Sort & filter — operands, expressions, multi-column, quick-filter, events | `references/sort-and-filter.md` |
 | Server-side data hooks (sort/filter/pagination/quickFilter), virtualization, `dataView` | `references/data-pipeline.md` |
-| Row pinning / reordering, undo-redo, validators, column groups, state & schema (`getState`/`setState`/`getSchema`), localization, export source | `references/state-and-features.md` |
+| Row pinning / reordering, undo-redo, batch edits (`applyEdits`), validators, column groups, state & schema (`getState`/`setState`/`getSchema`), localization, export source | `references/state-and-features.md` |
 | End-to-end vanilla JS (no Lit `render`) | `references/vanilla-js.md` |
 | Lit, React, Vue, Angular integration | `references/framework-integration.md` |
