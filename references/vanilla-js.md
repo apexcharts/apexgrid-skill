@@ -134,12 +134,15 @@ grid.clearSort();
 grid.clearFilter();
 ```
 
-Programmatic calls don't fire `sorting` / `sorted` / `filtering` / `filtered` events. If you need a hook for every state change regardless of source, watch `grid.dataView` after each programmatic call:
+Programmatic calls don't fire `sorting` / `sorted` / `filtering` / `filtered` events. If you need a hook for every state change regardless of source, read `grid.dataView` once the grid has updated after each programmatic call:
 
 ```js
 grid.sort({ key: 'age', direction: 'descending' });
-queueMicrotask(() => console.log('post-sort:', grid.dataView));
+await grid.updateComplete;                 // the in-memory pipeline has run by now
+console.log('post-sort:', grid.dataView);
 ```
+
+A `queueMicrotask` callback is too early: it runs before the pipeline assigns the new view. With an async `dataPipelineConfiguration` hook the new rows exist only once your hook resolves, so act on them there.
 
 ---
 

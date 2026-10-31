@@ -19,7 +19,7 @@ import { setup } from 'apex-grid';
 setup();                         // registers <apex-grid> + adopts a bounded host height
 ```
 
-No theme import needed — the grid self-styles. Retheme by overriding `--ag-*` CSS variables on `apex-grid`. If you prefer manual control over sizing, call `setup({ hostStyles: false })` (or use `import 'apex-grid/define'`) and add your own rule:
+No theme import needed: the grid self-styles. Retheme by overriding `--ag-*` CSS variables on `apex-grid` or on any ancestor (an app shell, a component's shadow host), and use the `--ag-dark-*` variables for grids with `theme="dark"` (SKILL.md §1.3). If you prefer manual control over sizing, call `setup({ hostStyles: false })` (or use `import 'apex-grid/define'`) and add your own rule:
 
 ```css
 apex-grid {
@@ -109,7 +109,7 @@ export function UsersGrid({ data }: { data: User[] }) {
 }
 ```
 
-If you'd rather size per instance instead of globally, replace the global CSS rule with a `style` prop: `style={{ height: '500px', display: 'block' }}`.
+If you'd rather size per instance instead of globally, replace the global CSS rule with a `style` prop: `style={{ height: '500px' }}`. Never add `display` there: the grid needs its own `display: grid`, collapses without it, and logs a console warning on first render when something overrides it.
 
 For full TypeScript / JSX intrinsic-element support:
 

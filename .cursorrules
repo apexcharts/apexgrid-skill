@@ -4,7 +4,7 @@ You are working with `apex-grid`, a Lit-based web-component data grid by ApexCha
 Documentation: https://github.com/apexcharts/apexgrid
 NPM: apex-grid (with a hyphen — no `apexgrid` package exists)
 GitHub: https://github.com/apexcharts/apexgrid
-Confirmed versions: apex-grid@3.0.1, lit@^3.0.0
+Confirmed versions: apex-grid@3.6.0, lit@^3.0.0
 
 ## Quickstart — register + size the host
 
@@ -16,7 +16,8 @@ height or it collapses and renders nothing. `setup()` handles both.
 ```bash
 npm install apex-grid lit
 ```
-`igniteui-webcomponents` installs transitively — you do NOT import theme CSS from it.
+That is the whole install: `apex-grid` brings `lit`, `@lit/context` and `@lit-labs/virtualizer`.
+There is no theme CSS to import from anywhere (3.5.0 dropped the old Ignite UI dependencies).
 
 ### 2. Register + size — `setup()` does both
 ```ts
@@ -28,10 +29,16 @@ Manual alternative: `import 'apex-grid/define'` (or `ApexGrid.register()`) plus 
 
 ### 3. Style via `--ag-*` CSS variables (no theme import)
 The grid is styled out of the box; retheme by overriding `--ag-*` custom properties on
-`apex-grid`. The deprecated `theme` option / `configureTheme()` does NOT affect appearance.
+`apex-grid` or on any ancestor, shadow hosts included (3.6). The deprecated `setup({ theme })`
+option / `configureTheme()` does NOT affect appearance.
 ```css
-apex-grid { height: 480px; /* + any --ag-* overrides */ }
+apex-grid { height: 480px; --ag-brand: #7c3aed; /* + any --ag-* overrides */ }
 ```
+Dark mode: the `theme="dark"` attribute (`tinted` adds brand chrome; `theme="dark tinted"`).
+Since 3.6 a dark grid reads `--ag-dark-*` colour tokens (`--ag-dark-surface`, `--ag-dark-text`, ...)
+and IGNORES the light ones (`--ag-surface`, ...), even when set on the dark grid itself.
+Brand, sizing and typography tokens are shared. In your own CSS, `var(--ag-brand)` has no
+root default: write `var(--ag-brand, #0d6fd3)`.
 
 ### Minimal example
 
@@ -88,7 +95,7 @@ render(
 1. **Apex Grid is a Lit web component, not a JS class.** Don't `new ApexGrid(...)`. Render `<apex-grid>` and set `.data` / `.columns` as properties.
 2. **Two setup steps:** register the element and give the host a bounded height — `setup()` does both. **No theme CSS import is needed** (the grid self-styles via `--ag-*`).
 3. **`columns` and `data` are properties, not attributes.** Use property binding.
-4. **`column.key` must be a real `keyof T`.** No aliases. Compute derived values in `cellTemplate`.
+4. **`column.key` must be a real `keyof T`.** No aliases. Compute derived values in `cellTemplate` (its `row` is the row element; the record is `row.data`).
 5. **Set `type` per column.** Primitive `'string'`/`'number'`/`'boolean'` drive sort/filter/editing (default `'string'`). Presentation types also exist: `'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'`.
 6. **`cellTemplate` and `headerTemplate` must return Lit `TemplateResult`s** (`html\`...\``). Strings render as escaped text.
 7. **Sort/filter events fire only for UI-initiated operations.** Programmatic `grid.sort(...)` / `grid.filter(...)` are silent.
@@ -145,8 +152,8 @@ render(html`<apex-grid auto-generate .data=${data}></apex-grid>`, root);
 
 | Type | Operands |
 |---|---|
-| `'string'` | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
-| `'number'` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
+| `'string'` and other non-numeric types | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
+| `'number'`, `'currency'`, `'rating'`, `'progress'` (3.6) | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
 | `'boolean'` | `all`, `true`, `false`, `empty`, `notEmpty` (all unary — no `searchTerm`) |
 
 ```ts
@@ -172,7 +179,7 @@ grid.filter([
 | `dataPipelineConfiguration` | `{ sort?, filter?, pagination?, quickFilter? }` | Server-side hooks |
 | `selection` / `editing` / `pagination` / `tree` / `expansion` | config objects | Opt-in: `{ enabled, ... }` (see SKILL.md §5) |
 | `quickFilter` / `columnReordering` | `string` / `boolean` | Global search / drag-reorder headers |
-| `sortExpressions` / `filterExpressions` | array (get/set) | To clear, use `clearSort()` / `clearFilter()` |
+| `sortExpressions` / `filterExpressions` | array (get/set) | Assigning REPLACES (3.6); `[]` clears. `sort()` / `filter()` add |
 | `selectedRows` / `expandedRows` | `T[]` (get/set) | Snapshots; set to replace |
 | `rows` (getter) | `ApexGridRow<T>[]` | Currently rendered only (virtualized) |
 | `dataView` / `pageItems` (getters) | `readonly T[]` | Full post-filter/sort / current page |
@@ -235,7 +242,7 @@ Built-in pipeline is skipped for whichever operations have a hook. Omit one to k
 
 ### 5. `column.key` not a `keyof T`
 ❌ `{ key: 'fullName' }` when not in `T`
-✅ `cellTemplate: ({ row }) => html\`${row.firstName} ${row.lastName}\``
+✅ `cellTemplate: ({ row }) => html\`${row.data.firstName} ${row.data.lastName}\`` (`row` is the element)
 
 ### 6. String from `cellTemplate`
 ❌ `cellTemplate: ({ value }) => \`<b>\${value}</b>\``
@@ -275,6 +282,25 @@ Built-in pipeline is skipped for whichever operations have a hook. Omit one to k
 - **Localization**: `localeText` (`GridLocaleText`), `localize()`, `esLocale` export.
 - **Misc**: `columnMenu`/`columnSeparator`; `exportToCSV`/`exportAs` `source: 'view'|'page'|'selected'|'all'`.
 - Full detail: `references/state-and-features.md`.
+
+---
+
+## Changed in 3.6
+
+- `sortExpressions` / `filterExpressions` assignment REPLACES the sort / filter (`[]` or `null` clears).
+  Assigning one expression at a time keeps only the last: assign the full list, or `grid.sort(expr)` to add.
+- `sorted`, `filtered`, `pageChanged`, `quickFilterChanged` fire after the pipeline run, so `dataView` is fresh
+  in the listener, async hooks included.
+- `currency`, `rating`, `progress` columns filter with the number operands; a `contains` on them is dropped.
+- A sort `comparer` receives raw values (original casing, `null` included); empty cells sort last otherwise.
+- `applyEdits([{ row, column, value }])` names a row by record (any page, pinned); `rowIndex` stays page-relative.
+- `grid.ownsEvent(e)`: events bubble, so filter out a nested master-detail grid's events with it.
+- `expansion.exportParts` re-exports parts used in `detailTemplate`; every row part now works with `apex-grid::part()`.
+- `rowMoving` / `rowMoved` add `position` and `toIndex`; a row move on a sorted grid clears the sort.
+- Row edit mode: validators get the staged row as `ctx.data`; checkbox and `ctx.commit` join the row edit.
+- Replacing `grid.data` with new records clears undo history; `grid.data = null` shows an empty grid.
+- CSV export prefixes formula-like text with `'` (`exportToCSV({ escapeFormulas: false })` to opt out);
+  booleans export `true` only for `true`; currency / progress export as numbers.
 
 ---
 

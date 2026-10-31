@@ -7,14 +7,15 @@ description: >
   table with `<apex-grid>`. Covers the register-and-size setup (no theme import —
   the grid styles itself via `--ag-*` CSS variables), the generic
   `ColumnConfiguration<T>` shape with its 13 column types, Lit `cellTemplate`
-  requirements, sorting / filtering / quick-filter, pagination, inline editing,
-  row selection, master-detail and tree rows, CSV export, batch writes via
-  `applyEdits`, right-to-left layout, the UI-only event model, and the
+  requirements, theming and dark mode (`--ag-*` / `--ag-dark-*` tokens,
+  `theme="dark"`), sorting / filtering / quick-filter, pagination, inline
+  editing, row selection, master-detail and tree rows, CSV export, batch writes
+  via `applyEdits`, right-to-left layout, the UI-only event model, and the
   `dataPipelineConfiguration` hooks for server-side data.
 metadata:
   author: ApexCharts
-  version: "2.3.1"
-  library_version: "3.5.0"
+  version: "2.4.0"
+  library_version: "3.6.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -38,7 +39,7 @@ That is the whole install. `apex-grid` brings its own runtime dependencies (`lit
 
 > **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly.
 
-> Confirmed working versions: `apex-grid@3.5.0`, `lit@^3.0.0`.
+> Confirmed working versions: `apex-grid@3.6.0`, `lit@^3.0.0`.
 
 ### 1.2 Register the element + size the host — `setup()` does both
 
@@ -62,20 +63,44 @@ apex-grid { height: 480px; }   /* any explicit height; % works if the parent is 
 
 `setup({ hostStyles: false })` registers the element but skips the injected host CSS, leaving sizing entirely to you. Without a bounded height (from `setup()` or your own CSS) the grid collapses and shows no rows.
 
+Since 3.6.0 the `setup()` sizing is adopted into whichever root each grid connects in, so a grid rendered inside another web component's shadow root gets it too. On 3.5 and earlier it reached the page only, and a grid inside a shadow root needed its own height rule there.
+
 > **Do not set `display` on `apex-grid`** — the component declares `:host { display: grid }` for its internal track layout; an outer `display` rule overrides it and collapses the virtualizer.
 
 ### 1.3 Styling — `--ag-*` CSS custom properties (no theme import)
 
-The grid is styled out of the box and customized entirely through `--ag-*` CSS custom properties — there is **no theme file to import and no `configureTheme()` call**. Set the variables on `apex-grid` (or an ancestor):
+The grid is styled out of the box and customized entirely through `--ag-*` CSS custom properties. There is **no theme file to import and no `configureTheme()` call**. Set the variables on `apex-grid` or on any ancestor: `:root`, a dashboard panel, or the shadow host of a web component the grid renders in.
 
 ```css
 apex-grid {
   height: 480px;
-  /* override any --ag-* variables to retheme; see the package README for the full list */
+  --ag-brand: #7c3aed;   /* selection, focus, accents; the brand washes follow it */
+  --ag-radius: 12px;     /* outer card radius */
+  --ag-row-h: 40px;      /* row height; see the package README for the full token list */
 }
 ```
 
-> The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables instead.
+> **Changed in 3.6.0:** the token defaults moved off the grid host onto `:where(:root)`, adopted into the document (through `adoptedStyleSheets`, so no CSP nonce) when the first grid connects. On 3.5 and earlier a value set on an ancestor never reached the grid, because the host's own default beat it; only values set on the `apex-grid` element took effect. Now both do, through shadow roots however deep.
+
+**Dark mode.** Add the `theme="dark"` attribute (an attribute, not a property). `theme="tinted"` mixes the brand into the chrome, and the two combine as `theme="dark tinted"`. A dark grid reads its own colour inputs, the `--ag-dark-*` tokens (`--ag-dark-surface`, `--ag-dark-surface-elevated`, `--ag-dark-grid-bg`, `--ag-dark-text`, `--ag-dark-text-muted`, `--ag-dark-hairline`, `--ag-dark-border`, `--ag-dark-row-hover`, `--ag-dark-shadow-card`, ...). Sizing, typography, motion, the brand and the base state colours are shared by both modes, so one place can theme light and dark grids:
+
+```css
+.dashboard {
+  --ag-brand: #7c3aed;
+  --ag-surface: #fdfcff;        /* light grids */
+  --ag-dark-surface: #140f24;   /* grids with theme="dark" */
+}
+apex-grid { --ag-grid-shadow: var(--ag-shadow-card); }                     /* elevated card edge */
+apex-grid[theme~='dark'] { --ag-grid-shadow: var(--ag-dark-shadow-card); } /* the same, on dark grids */
+```
+
+> **Changed in 3.6.0:** a light colour token (`--ag-surface`, `--ag-text`, `--ag-border`, ...) no longer applies to a dark grid, whether it is set on an ancestor or **on the dark grid element itself**. A rule such as `apex-grid[theme='dark'] { --ag-surface: #111; }` is now ignored: write `--ag-dark-surface`. A `theme="tinted"` grid ignores `--ag-border` and `--ag-dark-border` (its row separators are the brand alone).
+
+**Reading tokens in your own CSS** (page styles, markup in a `cellTemplate`): `var(--ag-surface)`, `var(--ag-text-muted)` and the other inputs resolve to their defaults anywhere on the page. `--ag-brand`, `--ag-brand-strong` and the derived washes (`--ag-brand-soft`, `--ag-brand-softer`, `--ag-brand-line`, `--ag-row-hover`, `--ag-surface-alt`) have no root default, so give them a fallback: `var(--ag-brand, #0d6fd3)`. To manage the defaults yourself, `setup({ tokenStyles: false })` skips the adopted sheet and `import 'apex-grid/tokens.css'` ships the same defaults as a file (also the way to get them into server-rendered HTML). The grid renders the same either way.
+
+**CSS parts.** Since 3.6.0 every part a body row renders is reachable with `apex-grid::part(...)`: `cell`, `selection-cell`, `selection-checkbox`, `expansion-cell`, `expansion-toggle`, `expansion-chevron`, `detail-panel`, `row-number-cell`, `row-number`, `reorder-handle-cell`, `reorder-handle`, `reorder-grip`. Before, only `cell` was. Parts inside your own `detailTemplate` content are reached by listing them in `expansion.exportParts` (`references/state-and-features.md`).
+
+> The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables (and the `theme="dark"` attribute) instead.
 
 ### 1.4 Minimal example — a styled, sortable, filterable table
 
@@ -143,7 +168,7 @@ AI models trained before the package was published may suggest `apexgrid` (no hy
 
 3. **`columns` and `data` are properties, not attributes.** Use property binding (`.columns=${...}` in Lit, `[columns]=` in Angular, `:columns.prop=` in Vue, `el.columns = ...` in vanilla JS). A stringified `columns="[...]"` HTML attribute becomes the literal string and the grid renders nothing.
 
-4. **`column.key` must be a real `keyof T`.** No `field` / `dataIndex` / `accessor` aliases. To display a derived value, compute it in `cellTemplate` (which has `row` access).
+4. **`column.key` must be a real `keyof T`.** No `field` / `dataIndex` / `accessor` aliases. To display a derived value, compute it in `cellTemplate`, whose `row` is the `<apex-grid-row>` element: the record is `row.data`.
 
 5. **Set `type` per column.** The primitive types `'string'`, `'number'`, `'boolean'` drive the default sort comparer, filter operands, and editor. The default is `'string'` — leaving a numeric column unset sorts as strings ("10" before "9"). There are also presentation types — `'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'` — that change rendering while sorting/filtering as their underlying value (§4).
 
@@ -210,33 +235,38 @@ Applied defaults (`DEFAULT_COLUMN_CONFIG`): `{ type: 'string', resizable: false,
 | `'currency'` | `Intl.NumberFormat` (`currency`, `locale`). Numeric |
 | `'avatar'` | first letter in a tinted circle |
 | `'badge'` | colored pill (`badgeVariant`) |
-| `'progress'` | health bar, 0..`max` (default 100) |
+| `'progress'` | health bar, 0..`max` (default 100). Numeric |
 | `'sparkline'` | inline trend chart of a `number[]` (`showDelta`) |
 | `'status'` | dot + pill (`statusVariant`, or inferred) |
 
 > A `'date'` column **does** exist in 3.x — use `type: 'date'` (it accepts `Date`, ISO strings, or millisecond timestamps), not a string column with a custom comparer.
 
-### Column type → filter operands (primitive types)
+### Column type → filter operands
 
 | `type` | Operand keys in the filter UI |
 |---|---|
-| `'string'` | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
-| `'number'` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
-| `'boolean'` | `all`, `true`, `false`, `empty`, `notEmpty` (all **unary** — no `searchTerm`) |
+| `'string'`, and every type not listed below (`select`, `date`, `image`, `avatar`, `badge`, `sparkline`, `status`) | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
+| `'number'`, and the numeric types `'currency'`, `'rating'`, `'progress'` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
+| `'boolean'` | `all`, `true`, `false`, `empty`, `notEmpty` (all **unary**: no `searchTerm`) |
 
 ```ts
-grid.filter({ key: 'subscribed', condition: 'true' });   // unary — no searchTerm
+grid.filter({ key: 'subscribed', condition: 'true' });   // unary: no searchTerm
+grid.filter({ key: 'price', condition: 'greaterThan', searchTerm: 100 });   // a 'currency' column
 ```
+
+> **Changed in 3.6.0:** `currency`, `rating` and `progress` columns filter as numbers. On 3.5 they took the text operands. A text condition such as `contains` on one of them, from `filter()` or a saved state, is now dropped with a console warning.
 
 ### Cell template
 
-Receives `ApexCellContext<T, K>` (`{ parent, row, column, value, commit? }`). Must return a Lit `TemplateResult`:
+Receives `ApexCellContext<T, K>` (`{ parent, row, column, value, commit? }`, where `row` is the `<apex-grid-row>` element and `row.data` the record). Must return a Lit `TemplateResult`:
 
 ```ts
 import { html } from 'lit';
 
 { key: 'name', cellTemplate: ({ value, row }) => html`<strong>${value}</strong>` }
 ```
+
+Since 3.6.0 a `cellTemplate` runs again for every visible row after each pipeline run (sort, filter, edit, quick filter, tree toggle), so a template that reads other fields of its row stays current. Keep templates cheap.
 
 ### Auto-generated columns — the 3-line demo
 
@@ -275,7 +305,7 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 
 | Property | Type | Notes |
 |---|---|---|
-| `data` | `T[]` | Setting triggers a pipeline run. |
+| `data` | `T[]` | Setting triggers a pipeline run. `null` / `undefined` (a framework prop still loading) shows an empty grid and reads back as `[]` (3.6). Replacing it with new records clears undo history and drops expansion of rows that left (`references/state-and-features.md`). |
 | `columns` | `ColumnConfiguration<T>[]` | Each entry merged with column defaults. |
 | `autoGenerate` (attr `auto-generate`) | `boolean` | Ignored if `columns` is non-empty. |
 | `sortConfiguration` | `{ multiple, triState }` | Multi-column + tri-state sorting toggles. |
@@ -293,7 +323,7 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 | `pinnedRows` *(getter)* | `{ top: T[]; bottom: T[] }` | Currently pinned rows per band. |
 | `canUndo` / `canRedo` *(getters)* | `boolean` | Undo/redo availability (needs `editing.history.enabled`). |
 | `exportFormats` *(getter)* | `readonly { id, label }[]` | Export menu formats (CSV in the community grid). |
-| `sortExpressions` / `filterExpressions` | `…[]` (get/set) | Current state. To clear, use `clearSort()` / `clearFilter()`. |
+| `sortExpressions` / `filterExpressions` | `…[]` (get/set) | Current state. Assigning **replaces** the whole sort / filter, and `[]` or `null` clears it (3.6; on 3.5 assignment merged and `[]` did nothing). `sort()` / `filter()` add instead. `clearSort()` / `clearFilter()` also clear. |
 | `selectedRows` / `expandedRows` | `T[]` (get/set) | Snapshots; set to replace (goes through cancellable events). |
 | `rows` *(getter)* | `ApexGridRow<T>[]` | **Currently rendered only** (virtualized). |
 | `dataView` *(getter)* | `readonly T[]` | Full post-filter/sort data. |
@@ -308,10 +338,10 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 | `editing` | `{ enabled, mode?: 'cell' \| 'row', trigger?: 'click' \| 'doubleClick', history?: { enabled, stackSize? } }` — plus per-column `editable: true` |
 | `selection` | `{ enabled, mode?: 'single' \| 'multiple', showCheckboxColumn? }` |
 | `pagination` | `{ enabled, mode?: 'local' \| 'remote', page?, pageSize?, pageSizeOptions?, totalItems? }` |
-| `tree` | `{ enabled, getDataPath: (row) => string[], groupColumnKey?, defaultExpanded?, childIndent? }` — flat data, hierarchy derived |
-| `expansion` | `{ enabled, detailTemplate: (ctx) => TemplateResult, isExpandable?, showToggleColumn? }` — master-detail |
+| `tree` | `{ enabled, getDataPath: (row) => string[], groupColumnKey?, defaultExpanded?, childIndent? }`: flat data, hierarchy derived. Under a filter, the ancestors of a match show as their own rows (3.6) |
+| `expansion` | `{ enabled, detailTemplate: (ctx) => TemplateResult, isExpandable?, showToggleColumn?, exportParts? }`: master-detail. `exportParts` (3.6) re-exports parts used in the detail content |
 | `rowPinning` | `{ enabled }` — sticky top/bottom bands via `pinRow()` / `unpinRow()` |
-| `rowReordering` | `{ enabled, applyToData?, handle? }` — drag/keyboard reorder + `moveRow()`; manual order is mutually exclusive with sort |
+| `rowReordering` | `{ enabled, applyToData?, handle? }`: drag/keyboard reorder + `moveRow()`. A sort clears the manual order, and a move clears the sort (3.6) |
 
 ```ts
 grid.editing    = { enabled: true, mode: 'cell', trigger: 'doubleClick', history: { enabled: true } };
@@ -333,7 +363,7 @@ Declarative validators (`column.validators`), column groups (`columnGroups`), un
 | `updateColumns(col \| col[])` | Merge new fields into existing columns by `key`. Triggers a pipeline run. |
 | `moveColumn(fromKey, toKey, position?)` | Reorder a column (within its pinning group). |
 | `pinColumn(key, 'start' \| 'end' \| null)` / `unpinColumn(key)` | Programmatic column pinning → `Promise<boolean>`; emits `columnPinning`/`columnPinned`. |
-| `exportToCSV(options?)` / `exportAs(formatId, options?)` | Export the data. CSV is built in. `options.source`: `'view'`(def)/`'page'`/`'selected'`/`'all'`. |
+| `exportToCSV(options?)` / `exportAs(formatId, options?)` | Export the data. CSV is built in. `options.source`: `'view'`(def)/`'page'`/`'selected'`/`'all'`. Formula-like CSV text (leading `=`, `+`, `-`, `@`, tab or CR; a plain signed number such as `-5` excepted) gets a leading apostrophe unless `escapeFormulas: false` (3.6). |
 | pagination | `gotoPage(n)`, `setPageSize(n)`, `nextPage()`, `previousPage()`, `firstPage()`, `lastPage()` → `Promise<boolean>`; emit `pageChanging`/`pageChanged`. |
 | `setQuickFilter(value)` | Apply global search (`''` clears) → `Promise<boolean>`; emits `quickFilterChanging`/`quickFilterChanged`. |
 | selection | `selectRow`, `deselectRow`, `toggleRowSelection`, `selectAllRows`, `clearSelection`, `isRowSelected` |
@@ -342,7 +372,8 @@ Declarative validators (`column.validators`), column groups (`columnGroups`), un
 | row pinning | `pinRow(row, 'top' \| 'bottom')`, `unpinRow(row)` (needs `rowPinning.enabled`) |
 | row reorder | `moveRow(from, to, position?)` (needs `rowReordering.enabled`) |
 | editing | `commitEdit()`, `cancelEdit()` (used with `mode: 'row'`) |
-| `applyEdits(edits)` | Write many cells as **one** operation: one undo step, one pipeline run. Returns a tally, not a count. (3.5) |
+| `applyEdits(edits)` | Write many cells as **one** operation: one undo step, one pipeline run. Returns a tally, not a count. (3.5) Each entry names its row by `rowIndex` (current page) or, since 3.6, by record: `{ row, column, value }` reaches any page, pinned rows and collapsed tree children. |
+| `ownsEvent(event)` | `true` when an event came from this grid, `false` when from a grid nested in one of its master-detail panels. (3.6) |
 | undo/redo | `undo()`, `redo()`, `clearHistory()` (needs `editing.history.enabled`) |
 | state | `getState(options?)` → `GridState`, `setState(partial, options?)` → `SetStateResult`, `getSchema()` → `GridSchema` |
 | `ApexGrid.register()` / `ApexGrid.tagName` | Static element registration / `'apex-grid'`. |
@@ -367,7 +398,18 @@ Every event fires only for operations driven through the grid's own UI; programm
 | `rowPinning` / `rowPinned` | row pin / unpin (also fires for `pinRow()`/`unpinRow()`) |
 | `rowMoving` / `rowMoved` | row reorder (also fires for `moveRow()`) |
 
-**Exceptions to "UI-only".** The dedicated programmatic methods added for pagination (`gotoPage`, `nextPage`, …), quick-filter (`setQuickFilter`), column pinning (`pinColumn` / `unpinColumn`), row pinning (`pinRow` / `unpinRow`), and row reorder (`moveRow`) **do** emit their `*-ing` / `*-ed` pairs (unlike `sort()` / `filter()`, which stay silent).
+**Exceptions to "UI-only".** The dedicated programmatic methods added for pagination (`gotoPage`, `nextPage`, …), quick-filter (`setQuickFilter`), column pinning (`pinColumn` / `unpinColumn`), row pinning (`pinRow` / `unpinRow`), and row reorder (`moveRow`) **do** emit their `*-ing` / `*-ed` pairs (unlike `sort()` / `filter()`, which stay silent). Since 3.6, `setQuickFilter` also fires `pageChanged` when it moves the grid back to the first page; assigning the `quickFilter` property stays silent.
+
+**Timing (3.6).** `sorted`, `filtered`, `pageChanged` and `quickFilterChanged` fire after the pipeline run they caused, so a listener that reads `grid.dataView`, `grid.pageItems` or `grid.totalItems` sees the new rows, even with an async `dataPipelineConfiguration` hook. On 3.5 they could fire before an async hook resolved.
+
+**Nested grids (3.6).** Grid events bubble and are composed, so a listener on a grid also hears the events of a grid nested in one of its master-detail panels. Filter them inside the listener:
+
+```ts
+grid.addEventListener('cellValueChanged', (e) => {
+  if (!grid.ownsEvent(e)) return;          // came from a grid inside a detail panel
+  save(e.detail.data);
+});
+```
 
 Single-shot events (no `-ing` pair):
 
@@ -379,7 +421,7 @@ Single-shot events (no `-ing` pair):
 
 Operand reference, multi-column sort, and server-side hooks: `references/sort-and-filter.md` and `references/data-pipeline.md`. Row pinning/reorder, undo/redo, validators, column groups, state/schema, and localization: `references/state-and-features.md`.
 
-### Keyboard & accessibility (3.4, 3.5)
+### Keyboard & accessibility (3.4 and later)
 
 The grid ships full keyboard operation and screen-reader support out of the box; there's nothing to enable. The body uses a **roving-tabindex** focus model: the active cell is the body's single tab stop, so `Tab` moves into and out of the grid in one step, and real focus follows arrow-key navigation (screen readers track cell-to-cell movement).
 
@@ -388,12 +430,12 @@ The grid ships full keyboard operation and screen-reader support out of the box;
 | Arrow keys | Move the active cell one cell up / down / left / right |
 | Home / End | Move to the **first / last cell of the current row** |
 | Ctrl/Cmd+Home / Ctrl/Cmd+End | Jump to the grid's first / last cell |
-| PageUp / PageDown | Page-scroll by a viewport |
+| PageUp / PageDown | Move the active cell by the rows that fit in the visible body (below the sticky header and pinned rows) |
 | Enter or F2 | Open the active cell's editor (editing is no longer pointer-only) |
 
-Keyboard-driven commit (Enter) or cancel (Escape) returns focus to the cell, so navigation continues from where you left off.
+Keyboard-driven commit (Enter) or cancel (Escape) returns focus to the cell, so navigation continues from where you left off. Since 3.6.0, after tabbing into the body with no cell active yet, the first arrow, Home or PageUp key activates the first cell instead of moving past it (ArrowDown lands on row 0).
 
-**Editing behavior:** clearing a `number` or `currency` editor now commits `null` (previously it wrote `NaN`). An empty or unparseable numeric input leaves the cell empty rather than poisoning the row.
+**Editing behavior:** clearing a `number` or `currency` editor now commits `null` (previously it wrote `NaN`). An empty or unparseable numeric input leaves the cell empty rather than poisoning the row. Since 3.6.0 an open editor stays on the record it was opened for when the data, sort, filter or page change under it, and the edit is cancelled if that record leaves the view; row mode edits a staged copy (`references/state-and-features.md`).
 
 **Announcements:** sorting, filtering, selection, paging, row pinning, row reorder, expansion, and undo / redo each announce through a localized live region, and the host applies a localized `aria-label` ("Data grid") plus `aria-multiselectable` when multi-row selection is on. The strings are locale keys (`announce.*`, `header.*`, `grid.label`, `editor.rating`); override them via `localeText` (see `references/state-and-features.md`).
 
@@ -433,7 +475,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 
 ### 5. `column.key` not a real key of `T`
 ❌ `{ key: 'fullName' }` when `User` has only `firstName` + `lastName`.
-✅ Compute via template: `cellTemplate: ({ row }) => html\`${row.firstName} ${row.lastName}\``.
+✅ Compute via template: `cellTemplate: ({ row }) => html\`${row.data.firstName} ${row.data.lastName}\``. The context's `row` is the row element; the record is `row.data`.
 
 ### 6. String from `cellTemplate`
 ❌ `cellTemplate: ({ value }) => \`<strong>\${value}</strong>\`` — renders as escaped text.
@@ -449,11 +491,19 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 
 ### 9. Clearing sort/filter
 ❌ Assuming you must rebuild state to clear it.
-✅ `grid.clearSort()` / `grid.clearFilter()` (optionally per `key`).
+✅ `grid.clearSort()` / `grid.clearFilter()` (optionally per `key`), or `grid.sortExpressions = []` / `grid.filterExpressions = []` (3.6).
 
 ### 10. Expecting events from programmatic operations
 ❌ Listening for `sorting` after calling `grid.sort(...)` — never fires.
 ✅ Wrap the programmatic call yourself, or watch `grid.dataView` for any state change.
+
+### 11. Building a multi-column sort one assignment at a time
+❌ `grid.sortExpressions = [byCity]; grid.sortExpressions = [byAge];` expecting both: since 3.6 each assignment **replaces** the sort (the same for `filterExpressions`), so only `byAge` applies.
+✅ Assign the full list, `grid.sortExpressions = [byCity, byAge]`, or add with `grid.sort(byAge)` / `grid.filter(expr)`.
+
+### 12. Theming a dark grid with the light tokens
+❌ `apex-grid[theme='dark'] { --ag-surface: #111827; --ag-text: #f9fafb; }`: since 3.6 a dark grid ignores the light colour tokens, even on its own element.
+✅ `apex-grid { --ag-dark-surface: #111827; --ag-dark-text: #f9fafb; }` (or on any ancestor). Brand, sizing and typography tokens are shared, so `--ag-brand` still applies to both.
 
 ---
 
@@ -464,6 +514,6 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 | Column types, templates, auto-generation, per-column styling, header/editor templates | `references/columns-and-templates.md` |
 | Sort & filter — operands, expressions, multi-column, quick-filter, events | `references/sort-and-filter.md` |
 | Server-side data hooks (sort/filter/pagination/quickFilter), virtualization, `dataView` | `references/data-pipeline.md` |
-| Row pinning / reordering, undo-redo, batch edits (`applyEdits`), validators, column groups, state & schema (`getState`/`setState`/`getSchema`), localization, export source | `references/state-and-features.md` |
+| Row pinning / reordering, undo-redo, batch edits (`applyEdits`), validators, row-mode editing, column groups, state & schema (`getState`/`setState`/`getSchema`), localization, export source and CSV escaping, master-detail parts and nested grids (`exportParts`, `ownsEvent`) | `references/state-and-features.md` |
 | End-to-end vanilla JS (no Lit `render`) | `references/vanilla-js.md` |
 | Lit, React, Vue, Angular integration | `references/framework-integration.md` |

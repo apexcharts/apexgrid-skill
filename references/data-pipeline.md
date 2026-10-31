@@ -66,7 +66,7 @@ The grid runs the stages in a fixed order: **quick-filter → column filter → 
 
 ### Hooks fire on every state change
 
-The pipeline runs whenever `data`, `columns`, sort state, or filter state changes — including programmatic `sort()` / `filter()` calls. If your server endpoint is expensive, debounce inside the hook:
+The pipeline runs whenever `data`, `columns`, sort state, or filter state changes, including programmatic `sort()` / `filter()` calls. Since 3.6 only the latest run's result is applied: a slower earlier run that resolves after a newer one is discarded, and no longer holds back the newer run's events. If your server endpoint is expensive, still abort or debounce inside the hook, so the superseded requests are not sent at all:
 
 ```ts
 let pending: AbortController | null = null;
@@ -142,6 +142,10 @@ const updateSummary = () => {
 grid.addEventListener('sorted', updateSummary);
 grid.addEventListener('filtered', updateSummary);
 ```
+
+Since 3.6 this is reliable with async hooks too: `sorted`, `filtered`, `pageChanged` and `quickFilterChanged` fire after the pipeline run they caused, so `dataView` already holds the new rows. On 3.5 they could fire before an async hook resolved and read the previous view. (They remain UI-only, except the page and quick-filter methods listed in SKILL.md §5.)
+
+Assigning `grid.data = null` or `undefined` (a framework prop still loading) shows an empty grid and reads back as `[]` since 3.6; on 3.5 it threw and kept the previous rows.
 
 ## Common pitfalls
 

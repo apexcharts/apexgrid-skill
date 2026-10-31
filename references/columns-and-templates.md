@@ -45,7 +45,7 @@ interface BaseColumnConfiguration<T extends object, K extends keyof T = keyof T>
 
 ### Column types (`DataType`)
 
-`'string'` / `'number'` / `'boolean'` are the primitive types driving sort, filter, and the default editor. The rest are presentation renderers over a primitive value (and sort/filter as that value): `'select'` (label from `options`, `<select>` editor), `'rating'` (stars, 0..`max`), `'date'` (locale date via `format`; accepts `Date`/ISO/timestamp; `<input type="date">` editor), `'image'` (`<img>`, `shape`/`alt`), `'currency'` (`Intl.NumberFormat`, `currency`/`locale`), `'avatar'`, `'badge'` (`badgeVariant`), `'progress'` (0..`max`), `'sparkline'` (`number[]`, `showDelta`), `'status'` (`statusVariant`).
+`'string'` / `'number'` / `'boolean'` are the primitive types driving sort, filter, and the default editor. The rest are presentation renderers over a primitive value (and sort/filter as that value): `'select'` (label from `options`, `<select>` editor), `'rating'` (stars, 0..`max`), `'date'` (locale date via `format`; accepts `Date`/ISO/timestamp; `<input type="date">` editor), `'image'` (`<img>`, `shape`/`alt`), `'currency'` (`Intl.NumberFormat`, `currency`/`locale`), `'avatar'`, `'badge'` (`badgeVariant`), `'progress'` (0..`max`), `'sparkline'` (`number[]`, `showDelta`), `'status'` (`statusVariant`). Of these, `'currency'`, `'rating'` and `'progress'` are numeric: since 3.6 they filter with the number operands and export as numbers, like `'number'`.
 
 Defaults applied on assignment (`DEFAULT_COLUMN_CONFIG`):
 
@@ -61,7 +61,7 @@ Defaults applied on assignment (`DEFAULT_COLUMN_CONFIG`):
 | `'number'` | numeric `<` / `>` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
 | `'boolean'` | `false < true` | `all`, `true`, `false`, `empty`, `notEmpty` |
 
-The table above lists the three **primitive** types. The presentation types (`'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'`) sort and filter as their underlying value. For dates, use the real `'date'` type — it accepts `Date`, ISO strings, or millisecond timestamps, renders a locale date (`format`), and sorts chronologically. No timestamp/comparer workaround needed:
+The table above lists the three **primitive** types. The presentation types (`'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'`) sort as their underlying value. For filtering, `'currency'`, `'rating'` and `'progress'` take the `'number'` operands (since 3.6; on 3.5 they took the text ones), and the others take the `'string'` operands. With the built-in comparison, empty cells (`null`, `undefined`, `NaN`, invalid `Date`) sort last in both directions (3.6). For dates, use the real `'date'` type: it accepts `Date`, ISO strings, or millisecond timestamps, renders a locale date (`format`), and sorts chronologically. No timestamp/comparer workaround needed:
 
 ```ts
 { key: 'createdAt', type: 'date', format: 'medium', sort: true, filter: true }
@@ -83,7 +83,7 @@ The table above lists the three **primitive** types. The presentation types (`'s
 }
 ```
 
-The `comparer` signature is fully typed against `T[K]`.
+The `comparer` signature is fully typed against `T[K]`. Since 3.6 it receives the **raw** cell values, original casing and `null` / `undefined` included, and owns their order (a descending sort reverses its result). On 3.5 it received strings already lower-cased (unless `caseSensitive`), so a lookup written in the data's casing (`'High'`, `'Low'`) never matched and the sort did nothing. Now the lookup above matches only values stored in lower case: write it in the data's own casing, and decide where empty values go.
 
 ## Filter configuration per column
 
@@ -101,11 +101,14 @@ Receives `ApexCellContext<T, K>`:
 ```ts
 interface BaseApexCellContext<T, K> {
   parent: ApexGridCell<T>;          // <apex-grid-cell> element
-  row:    ApexGridRow<T>;           // <apex-grid-row> element
+  row:    ApexGridRow<T>;           // <apex-grid-row> element; the record is row.data
   column: ColumnConfiguration<T, K>;
   value:  T[K];                     // T[K] — fully typed
+  commit?: (value: T[K]) => Promise<boolean>;   // editable columns only: write without opening the editor
 }
 ```
+
+Since 3.6 a `cellTemplate` runs again for every visible row, body and pinned, after each pipeline run (sort, filter, quick filter, edit, tree toggle), so a template that reads other fields of `row.data` stays current after an edit to another cell. Keep templates cheap; plain and typed cells are not re-rendered this way. In row edit mode, `commit(value)` stages the value with the row edit instead of writing straight to the record (3.6), so `cancelEdit()` rolls it back.
 
 ```ts
 import { html } from 'lit';
@@ -118,11 +121,11 @@ const columns: ColumnConfiguration<User>[] = [
   { key: 'name',
     cellTemplate: ({ value }) => html`<strong>${value}</strong>` },
 
-  // Conditional render with row context
+  // Conditional render with row context (row is the element, row.data the record)
   { key: 'subscribed', type: 'boolean',
     cellTemplate: ({ value, row }) => html`
       <input type="checkbox" .checked=${value} disabled />
-      <small>${row.name}</small>` },
+      <small>${row.data.name}</small>` },
 
   // Prefer the built-in type over a template where one exists:
   // `avatar` and `rating` are column types, no template needed.
@@ -173,7 +176,7 @@ import { required, min, max, pattern, custom } from 'apex-grid';
   validators: [custom((value, ctx) => (value === ctx.data.id ? 'Cannot equal id' : null))] }
 ```
 
-Built-in factories: `required(message?)`, `min(limit, message?)`, `max(limit, message?)`, `pattern(regex, message?)`, `custom(fn)`. `min`/`max`/`pattern` pass on empty / non-numeric values — compose with `required`. See `references/state-and-features.md` for the `Validator` / `ValidatorContext` shapes and the `cellValidationFailed` payload.
+Built-in factories: `required(message?)`, `min(limit, message?)`, `max(limit, message?)`, `pattern(regex, message?)`, `custom(fn)`. `min`/`max`/`pattern` pass on empty / non-numeric values, so compose with `required`. In row edit mode `ctx.data` is the staged row (the record with the row's pending values applied) since 3.6, so a cross-field rule such as `ctx.data.end >= ctx.data.start` sees the row being saved. See `references/state-and-features.md` for the `Validator` / `ValidatorContext` shapes and the `cellValidationFailed` payload.
 
 **Numeric editing (3.4):** clearing a `number` or `currency` editor now commits `null`, not `NaN`. An empty or unparseable numeric input leaves the cell empty instead of writing `NaN` into the row. Editing also opens from the keyboard now (Enter or F2 on the active cell), not only by pointer; see SKILL.md §5 for the full keyboard model. Separately, a spreadsheet-style error value (an object carrying a `#...` code, such as an enterprise formula engine's `#VALUE!`) renders as its code in typed `number` / `currency` columns rather than coercing to `NaN` and showing an empty cell.
 
@@ -246,7 +249,8 @@ The grid renders a drag handle on the right edge of the column header. Minimum r
 
 | ❌ | ✅ |
 |---|---|
-| `{ key: 'fullName' }` when `fullName` isn't in `T` | Add to `T`, or compute via `cellTemplate: ({ row }) => html\`${row.firstName} ${row.lastName}\`` |
+| `{ key: 'fullName' }` when `fullName` isn't in `T` | Add to `T`, or compute via `cellTemplate: ({ row }) => html\`${row.data.firstName} ${row.data.lastName}\`` |
+| `cellTemplate: ({ row }) => row.name` | `row` is the `<apex-grid-row>` element: read the record as `row.data.name` |
 | `cellTemplate: ({ value }) => \`<b>\${value}</b>\`` (string) | `cellTemplate: ({ value }) => html\`<b>\${value}</b>\`` |
 | `{ key: 'age', sort: true }` (default `type: 'string'`) | Set `type: 'number'` |
 | `{ key: 'created', type: 'string', sort: { comparer } }` to fake dates | `{ key: 'created', type: 'date', format: 'medium' }` — a real type (accepts `Date`/ISO/timestamp) |
