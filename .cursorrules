@@ -17,7 +17,10 @@ height or it collapses and renders nothing. `setup()` handles both.
 npm install apex-grid lit
 ```
 That is the whole install: `apex-grid` brings `lit`, `@lit/context` and `@lit-labs/virtualizer`.
-There is no theme CSS to import from anywhere (3.5.0 dropped the old Ignite UI dependencies).
+There is no theme CSS to import for a styled grid (3.5.0 dropped the old `igniteui-webcomponents`
+dependency). An Ignite UI theme never fully themed the grid: 3.x only took its brand and font. From
+4.0 the only way to follow an Ignite UI theme is the free `apex-grid/ignite-ui` add-on (next 4.0
+release; see "Ignite UI theming" below).
 
 ### 2. Register + size — `setup()` does both
 ```ts
@@ -39,6 +42,24 @@ Since 3.6 a dark grid reads `--ag-dark-*` colour tokens (`--ag-dark-surface`, `-
 and IGNORES the light ones (`--ag-surface`, ...), even when set on the dark grid itself.
 Brand, sizing and typography tokens are shared. In your own CSS, `var(--ag-brand)` has no
 root default: write `var(--ag-brand, #0d6fd3)`.
+
+### Ignite UI theming (from the next apex-grid 4.0 release, after 4.0.0-beta.1)
+`import 'apex-grid/ignite-ui';` once (free, no licence key; ES modules only, no script-tag file).
+Every grid on the page, shadow roots included, then follows the Ignite UI theme: brand, text,
+gridlines, pinned edge, header (`--ig-surface-raised`, 7.5+), state colours, font, enterprise popups.
+- Ranking: `--ag-*` you set > family `--apx-*` tokens > Ignite UI > built-in values
+  (family-wide: explicit option > product CSS variable > `--apx-*` > named theme/palette > `--ig-*` > defaults).
+- Mode: no `theme` attribute follows `--ig-theme-variant` live; `theme="light"`/`"dark"` pins the mode
+  (a pinned `light` blocks the dark variant).
+- Per grid: `design-system="off"` (`designSystem = false`) drops the Ignite UI colours and font;
+  `tokens="off"` (`tokens = false`) drops `--apx-*` and Ignite UI, variant included.
+- Live: no `refreshTokens()` needed. With the add-on, the Ignite-following tokens leave the root
+  defaults: page CSS reading them needs a fallback, `var(--ag-text, #111827)`.
+- New tokens `--ag-overlay`, `--ag-overlay-text` (dark: `--ag-dark-overlay`, `--ag-dark-overlay-text`)
+  colour the enterprise popups; no default.
+- BREAKING (4.0): the grid no longer reads `--ig-*` by itself (3.x took the brand and font with no
+  import). Without the add-on an Ignite UI stylesheet changes nothing. The 4.0 grid also follows
+  `--apx-*` set on `:root`.
 
 ### Minimal example
 
@@ -234,7 +255,8 @@ Built-in pipeline is skipped for whichever operations have a hook. Omit one to k
 
 ### 3. Importing a theme CSS that no longer exists
 ❌ `import 'igniteui-webcomponents/themes/.../bootstrap.css'` + `configureTheme(...)` — obsolete; no effect.
-✅ No import needed — grid self-styles; retheme via `--ag-*`. The only required CSS is host height.
+✅ No import needed for a styled grid; retheme via `--ag-*`. The only required CSS is host height.
+To follow an Ignite UI theme, `import 'apex-grid/ignite-ui'` (next 4.0 release), not a theme import.
 
 ### 4. Stringified attribute
 ❌ `<apex-grid columns="[...]">`
@@ -267,6 +289,11 @@ Built-in pipeline is skipped for whichever operations have a hook. Omit one to k
 ### 11. Wrong package name
 ❌ `import ... from 'apexgrid'` — no such package.
 ✅ `import ... from 'apex-grid'`.
+
+### 12. Ignite UI theme without the add-on (4.0)
+❌ Ignite UI stylesheet on the page, no `apex-grid/ignite-ui`: `--ig-*` is silently ignored in 4.0.
+❌ `theme="light"` on the grid while the page switches to a dark Ignite UI theme: blocks the dark variant.
+✅ `import 'apex-grid/ignite-ui'` once and leave `theme` unset.
 
 ---
 

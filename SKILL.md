@@ -5,7 +5,8 @@ description: >
   data grid by ApexCharts). Use whenever the user asks to create, configure, or
   troubleshoot a sortable / filterable / paginated / editable / virtualized data
   table with `<apex-grid>`. Covers the register-and-size setup (no theme import —
-  the grid styles itself via `--ag-*` CSS variables), the generic
+  the grid styles itself via `--ag-*` CSS variables), the optional free
+  `apex-grid/ignite-ui` add-on that follows an Ignite UI theme, the generic
   `ColumnConfiguration<T>` shape with its 13 column types, Lit `cellTemplate`
   requirements, theming and dark mode (`--ag-*` / `--ag-dark-*` tokens,
   `theme="dark"`), sorting / filtering / quick-filter, pagination, inline
@@ -37,7 +38,7 @@ npm install apex-grid lit
 
 That is the whole install. `apex-grid` brings its own runtime dependencies (`lit`, `@lit/context`, `@lit-labs/virtualizer`) and there is **no theme CSS to import** from anywhere.
 
-> **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly.
+> **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly. An Ignite UI theme on the page never fully themed the grid: through 3.x it only tinted the brand and replaced the font. From 4.0 the only way to make the grid follow an Ignite UI theme is the `apex-grid/ignite-ui` add-on (from the next apex-grid 4.0 release, §1.3).
 
 > Confirmed working versions: `apex-grid@3.6.0`, `lit@^3.0.0`.
 
@@ -100,7 +101,24 @@ apex-grid[theme~='dark'] { --ag-grid-shadow: var(--ag-dark-shadow-card); } /* th
 
 **CSS parts.** Since 3.6.0 every part a body row renders is reachable with `apex-grid::part(...)`: `cell`, `selection-cell`, `selection-checkbox`, `expansion-cell`, `expansion-toggle`, `expansion-chevron`, `detail-panel`, `row-number-cell`, `row-number`, `reorder-handle-cell`, `reorder-handle`, `reorder-grip`. Before, only `cell` was. Parts inside your own `detailTemplate` content are reached by listing them in `expansion.exportParts` (`references/state-and-features.md`).
 
-> The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables (and the `theme="dark"` attribute) instead.
+> The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables (and the `theme="dark"` attribute) instead, and to follow an Ignite UI theme, the `apex-grid/ignite-ui` add-on below.
+
+**Ignite UI theming (from the next apex-grid 4.0 release, after `4.0.0-beta.1`).** To make grids follow an Ignite UI theme loaded on the page, import the add-on once. It is free and needs no licence key.
+
+```ts
+import 'apex-grid/ignite-ui';
+```
+
+Every grid on the page, in the document or any shadow root, then follows the theme, including grids that connected before the import: the brand (`--ig-primary-*`), text and muted text, gridlines and the pinned-column edge, the header (`--ig-surface-raised`, Ignite UI 7.5+), the state colours, the font, and the `apex-grid-enterprise` popups (`--ig-surface-overlay`, 7.5+). Card and row surfaces keep the grid's own light or dark background. The add-on registers on a shared `globalThis` slot, so it reaches grids from a separately built bundle too. The grid ships as ES modules only: load it from your bundle or a `<script type="module">`.
+
+- **Ranking**, highest first: an `--ag-*` token you set > the family `--apx-*` tokens (`--apx-accent`, `--apx-fore`, `--apx-grid`, `--apx-surface`, `--apx-font-family`, `--apx-radius-factor`, also new in that release) > Ignite UI > built-in values. (Across the Apex family: explicit option > product CSS variable > `--apx-*` > named theme/palette > `--ig-*` > defaults.)
+- **Mode:** a grid without a `theme` attribute follows the Ignite UI variant (`--ig-theme-variant`) declared on `:root` or an ancestor, live, on a theme swap too. `theme="light"` keeps a grid light and `theme="dark"` keeps it dark, so do not pin `theme="light"` if the grid should go dark with a dark Ignite UI theme.
+- **Per grid:** `design-system="off"` (property `designSystem = false`) turns the Ignite UI colours and font off (the variant still picks the mode); `tokens="off"` (`tokens = false`) turns off the `--apx-*` tokens and Ignite UI together, the variant included, for the grid and the content it renders.
+- **No `refreshTokens()` needed:** the grid follows the cascade live.
+- **Your own CSS:** while the add-on is loaded, the tokens that follow Ignite UI (text, lines, surfaces, header, state colours, pinned edge) leave the root defaults, so page CSS that reads one needs its own fallback: `var(--ag-text, #111827)`.
+- **Enterprise popups:** new tokens `--ag-overlay` and `--ag-overlay-text` (dark grids: `--ag-dark-overlay`, `--ag-dark-overlay-text`) colour the `apex-grid-enterprise` popups; unset, each keeps its built-in colours. For the enterprise chart panel to read the theme itself, also import `apexcharts/features/ignite-ui` (the grid never loads it).
+
+> **Breaking in the next 4.0 release:** the grid no longer reads Ignite UI tokens by itself. Through 3.x an Ignite UI theme on the page re-tinted the brand (`--ig-primary-500`, `--ig-primary-700`) and replaced the font (`--ig-font-family`) with no import. From 4.0 an Ignite UI stylesheet changes nothing until you `import 'apex-grid/ignite-ui'`, which brings the brand and font back along with the rest of the theme. The 4.0 grid also follows the family `--apx-*` tokens: a page that sets them on `:root` for its charts sees the grid follow them too (set the matching `--ag-*` tokens to keep the grid as it was).
 
 ### 1.4 Minimal example — a styled, sortable, filterable table
 
@@ -467,7 +485,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 
 ### 3. Importing a theme CSS that no longer exists
 ❌ `import 'igniteui-webcomponents/themes/light/bootstrap.css'` + `setup({ theme: 'bootstrap' })` is obsolete; it never affected the grid, and as of 3.5.0 the option is inert and that package is not even installed.
-✅ Nothing to import — the grid styles itself; retheme via `--ag-*` CSS variables. The only required CSS is a host **height**.
+✅ Nothing to import for a styled grid: it styles itself; retheme via `--ag-*` CSS variables. The only required CSS is a host **height**. To follow an Ignite UI theme that the page loads, the path is the `apex-grid/ignite-ui` add-on (from the next 4.0 release, §1.3), not a theme import into the grid.
 
 ### 4. Stringified `columns` attribute
 ❌ `<apex-grid columns="[...]">` — becomes the literal string `"[object Object],..."`.
@@ -504,6 +522,10 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 ### 12. Theming a dark grid with the light tokens
 ❌ `apex-grid[theme='dark'] { --ag-surface: #111827; --ag-text: #f9fafb; }`: since 3.6 a dark grid ignores the light colour tokens, even on its own element.
 ✅ `apex-grid { --ag-dark-surface: #111827; --ag-dark-text: #f9fafb; }` (or on any ancestor). Brand, sizing and typography tokens are shared, so `--ag-brand` still applies to both.
+
+### 13. Expecting an Ignite UI theme to restyle the grid without the add-on (4.0)
+❌ Loading an Ignite UI theme stylesheet and expecting the 4.0 grid to follow it: without `apex-grid/ignite-ui` every `--ig-*` token is silently ignored (3.x picked up the brand and font on its own; 4.0 does not). Also ❌ `theme="light"` on a page that switches to a dark Ignite UI theme: the pinned mode blocks the dark variant.
+✅ `import 'apex-grid/ignite-ui'` once (free, no licence key) and leave the `theme` attribute off so the grid follows `--ig-theme-variant`. Use `design-system="off"` or `tokens="off"` to opt one grid out.
 
 ---
 
