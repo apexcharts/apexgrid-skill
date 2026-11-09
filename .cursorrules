@@ -20,7 +20,7 @@ npm install apex-grid lit
 That is the whole install: `apex-grid` brings `lit`, `@lit/context` and `@lit-labs/virtualizer`.
 There is no theme CSS to import for a styled grid (3.5.0 dropped the old `igniteui-webcomponents`
 dependency). An Ignite UI theme never fully themed the grid: 3.x only took its brand and font. From
-4.0 the only way to follow an Ignite UI theme is the free `apex-grid/ignite-ui` add-on (not in 3.x;
+4.0 the only way to follow an Ignite UI theme is the `apex-grid/ignite-ui` add-on, which needs no extra licence key (not in 3.x;
 see "Ignite UI theming" below).
 
 ### 2. Register + size — `setup()` does both
@@ -45,7 +45,7 @@ Brand, sizing and typography tokens are shared. In your own CSS, `var(--ag-brand
 root default: write `var(--ag-brand, #0d6fd3)`.
 
 ### Ignite UI theming (new in 4.0)
-`import 'apex-grid/ignite-ui';` once (free, no licence key; ES modules only, no script-tag file).
+`import 'apex-grid/ignite-ui';` once (no extra licence key; ES modules only, no script-tag file).
 Every grid on the page, shadow roots included, then follows the Ignite UI theme: brand, text,
 gridlines, pinned edge, header (`--ig-surface-raised`, 7.5+), state colours, font, enterprise popups.
 - Ranking: `--ag-*` you set > family `--apx-*` tokens > Ignite UI > built-in values

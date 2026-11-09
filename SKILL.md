@@ -5,8 +5,8 @@ description: >
   data grid by ApexCharts). Use whenever the user asks to create, configure, or
   troubleshoot a sortable / filterable / paginated / editable / virtualized data
   table with `<apex-grid>`. Covers the register-and-size setup (no theme import —
-  the grid styles itself via `--ag-*` CSS variables), the optional free
-  `apex-grid/ignite-ui` add-on that follows an Ignite UI theme, the generic
+  the grid styles itself via `--ag-*` CSS variables), the optional
+  `apex-grid/ignite-ui` add-on (no extra licence key) that follows an Ignite UI theme, the generic
   `ColumnConfiguration<T>` shape with its 13 column types, Lit `cellTemplate`
   requirements (read the record from `ctx.data`; body rows are recycled),
   theming and dark mode (`--ag-*` / `--ag-dark-*` tokens, `theme="dark"`),
@@ -113,7 +113,7 @@ apex-grid::part(search-input)     { font-size: 14px; }
 
 > The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables (and the `theme="dark"` attribute) instead, and to follow an Ignite UI theme, the `apex-grid/ignite-ui` add-on below.
 
-**Ignite UI theming (new in 4.0.0).** The add-on ships with apex-grid 4.0; on 3.x `import 'apex-grid/ignite-ui'` does not resolve. To make grids follow an Ignite UI theme loaded on the page, import the add-on once. It is free and needs no licence key.
+**Ignite UI theming (new in 4.0.0).** The add-on ships with apex-grid 4.0; on 3.x `import 'apex-grid/ignite-ui'` does not resolve. To make grids follow an Ignite UI theme loaded on the page, import the add-on once. It needs no licence key of its own.
 
 ```ts
 import 'apex-grid/ignite-ui';
@@ -560,7 +560,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 
 ### 13. Expecting an Ignite UI theme to restyle the grid without the add-on (4.0)
 ❌ Loading an Ignite UI theme stylesheet and expecting the 4.0 grid to follow it: without `apex-grid/ignite-ui` every `--ig-*` token is silently ignored (3.x picked up the brand and font on its own; 4.0 does not). Also ❌ `theme="light"` on a page that switches to a dark Ignite UI theme: the pinned mode blocks the dark variant. Also ❌ `import 'apex-grid/ignite-ui'` on apex-grid 3.x: the module does not exist there.
-✅ apex-grid 4.0, then `import 'apex-grid/ignite-ui'` once (free, no licence key) and leave the `theme` attribute off so the grid follows `--ig-theme-variant`. Use `design-system="off"` or `tokens="off"` to opt one grid out.
+✅ apex-grid 4.0, then `import 'apex-grid/ignite-ui'` once (no extra licence key) and leave the `theme` attribute off so the grid follows `--ig-theme-variant`. Use `design-system="off"` or `tokens="off"` to opt one grid out.
 
 ### 14. Treating a row element as a record (4.0)
 ❌ A click handler in a `cellTemplate` that reads `ctx.row.data` after an `await`, or code that keeps `grid.rows[0]` as a handle: with recycling (the 4.0 default) that element can show another record after a scroll, sort or filter, so the code acts on the wrong row. Also ❌ an `<input>` or third-party widget in a `cellTemplate` that keeps its own typed state: the state shows on another record after a scroll.

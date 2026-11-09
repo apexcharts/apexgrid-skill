@@ -20,7 +20,7 @@ AI models routinely get web-component grid code wrong: they treat `<apex-grid>` 
 
 ### Coverage
 
-- **Quickstart**: register + size the host (`setup()` does both); no theme import, since the grid self-styles via `--ag-*` CSS variables; the free `apex-grid/ignite-ui` add-on (apex-grid 4.0) follows an Ignite UI theme
+- **Quickstart**: register + size the host (`setup()` does both); no theme import, since the grid self-styles via `--ag-*` CSS variables; the `apex-grid/ignite-ui` add-on (apex-grid 4.0, no extra licence key) follows an Ignite UI theme
 - **Upgrading from 3.x to 4.0**: row recycling and `ctx.data`, the grid role on `[part~="table"]`, pagination and validator changes
 - **Custom-element registration** — `setup()`, `import 'apex-grid/define'`, or `ApexGrid.register()`
 - **Generic `ColumnConfiguration<T>`** — `key`, the 13 column `type`s (incl. `date`, `select`, `currency`, …), templates, `sort`, `filter`, `pinned`, explicit widths
