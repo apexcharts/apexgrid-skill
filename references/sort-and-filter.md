@@ -109,6 +109,14 @@ Unary operands (no `searchTerm` needed): `empty`, `notEmpty`, `all`, `true`, `fa
 
 Since 3.6 the numeric presentation types `currency`, `rating` and `progress` take the number operands (on 3.5 they took the text ones). A condition name that does not belong to the column's set, such as `contains` on a `currency` column, is dropped with a console warning, from `filter()` and from a saved state alike. Text conditions read `null` / `undefined` as empty text and match other values (numbers, dates) on their text instead of throwing, and the range conditions (`greaterThan`, `lessThan`, ...) no longer match an empty cell as if it were 0.
 
+**Typed numbers in the filter panel (Changed in 4.0.0).** On a numeric column (`number`, `currency`, `rating`, `progress`) the filter panel reads a number as a person writes it: full-width digits and signs (`１２３`, `－５`), the grouping and decimal separator of the column's `locale` (or the runtime locale), and a leading or trailing `¥`, `$`, `€`, `円` or the column currency's symbol. On 3.6 `１２３` did not filter and `1,000` filtered by 1. A plain ASCII decimal reads as before in every locale (`1.000` filters as 1 even under `'de-DE'`), the input keeps the text as typed, and text the parser does not read falls back to its leading number as in 3.x (`12.5%` filters by 12.5, `10²` by 10). The `min()` / `max()` validators have no such fallback: `12.5%` or `10²` there is not a number, so the value fails. Programmatic `filter()` / `filterExpressions` terms are not parsed: pass a number as `searchTerm`.
+
+```ts
+{ key: 'price', type: 'currency', currency: 'EUR', locale: 'de-DE', filter: true }   // typing 1.234,5 filters by 1234.5
+```
+
+**IME input (4.0).** Japanese, Chinese or Korean typed through an input method works in the filter panel and the quick filter: the Enter, Escape and Tab that confirm or cancel a conversion stay with the IME (they do not close the panel or clear the quick filter), the text applies once the conversion ends rather than on every unconverted keystroke, and a quick filter search still waiting out its debounce is dropped when a conversion starts. Typing without an IME filters as before.
+
 ### Programmatic filter
 
 ```ts

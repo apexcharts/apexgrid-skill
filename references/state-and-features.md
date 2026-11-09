@@ -1,6 +1,6 @@
 # State, Localization & Interaction Features (3.1+)
 
-> Everything here landed in **apex-grid 3.1 and later** on top of the 3.0 API; version tags mark what is newer. The setup rules from `SKILL.md` (register + bounded host height, no theme import) still apply. Row pinning / reordering, undo-redo, and validators are all **opt-in** via a config object, off by default.
+> Everything here landed in **apex-grid 3.1 and later** on top of the 3.0 API; version tags mark what is newer (up to 4.0). The setup rules from `SKILL.md` (register + bounded host height, no theme import) still apply. Row pinning / reordering, undo-redo, and validators are all **opt-in** via a config object, off by default.
 
 ## Row pinning — sticky top / bottom bands
 
@@ -22,6 +22,19 @@ grid.pinnedRows;                                // getter → { top: T[]; bottom
 | `pinnedRows` *(getter)* | `{ top: T[]; bottom: T[] }` | In pin order. |
 
 Events: `rowPinning` (cancellable) → `rowPinned`, both `CustomEvent<{ row: T; position: 'top' | 'bottom' | null }>` (`null` when unpinning). Pins survive sort / filter / pagination as long as row identity is preserved. Since 3.6, replacing `grid.data` carries the pins onto the new rows: matched by `rowId` when it is set, otherwise a pin whose object left the data is dropped (re-pin those). While `rowPinning.enabled` is `false`, `pinnedRows` reports none and the rows return to the body, but the pins are kept (`getState` still saves them) and come back when pinning is re-enabled.
+
+**With pagination (Changed in 4.0.0):** pinned rows show on every page and no longer count toward the pages: `totalItems`, `pageCount`, the paginator summary and the `pageChanged` detail count only the rows the pager pages through, and pinning a row on the last page can move the grid to the new last page. Without pagination `totalItems` still counts every row.
+
+**A pinned summary row that cannot be selected (4.0):** pinned rows are selectable like any other unless `selection.isRowSelectable` says otherwise.
+
+```ts
+const totalRow = { id: -1, name: 'Total', amount: sum };
+grid.data = [...rows, totalRow];
+grid.rowPinning = { enabled: true };
+grid.pinRow(totalRow, 'bottom');
+grid.selection = { enabled: true, mode: 'multiple', showCheckboxColumn: true,
+                   isRowSelectable: (row) => row !== totalRow };   // no checkbox, skipped by Select all
+```
 
 ## Row reordering — drag / keyboard / API
 
@@ -128,16 +141,31 @@ const columns: ColumnConfiguration<User>[] = [
 | Factory | Signature | Fails when |
 |---|---|---|
 | `required(message?)` | `(msg?) => Validator` | value is `null` / `undefined` / empty-or-whitespace string |
-| `min(limit, message?)` | `(number, msg?) => Validator` | numeric value `< limit` (non-numeric / empty pass — compose with `required`) |
-| `max(limit, message?)` | `(number, msg?) => Validator` | numeric value `> limit` (non-numeric / empty pass) |
+| `min(limit, message?)` | `(number, msg?) => Validator` | numeric value `< limit`, or (4.0) a value that is not a number (empty passes; compose with `required`) |
+| `max(limit, message?)` | `(number, msg?) => Validator` | numeric value `> limit`, or (4.0) a value that is not a number (empty passes) |
 | `pattern(regex, message?)` | `(RegExp, msg?) => Validator` | `String(value)` doesn't match `regex` (empty passes) |
 | `custom(fn)` | `(Validator) => Validator` | wraps a predicate; an inline arrow works identically |
+
+> **Changed in 4.0.0:** `min()` and `max()` fail a value that is not a number; on 3.x `'abc'` (any text `Number()` could not read) passed both. Text is read as a person types it: full-width digits and signs (`１２３`, `－５`), the grouping and decimal separator of the column's `locale` (or the runtime locale), and a leading or trailing `¥`, `$`, `€`, `円` or the column currency's symbol.
 
 ```ts
 // Validator signature
 type Validator<T, K> = (value: unknown, context: ValidatorContext<T, K>) => string | null;
-interface ValidatorContext<T, K> { column: ColumnConfiguration<T, K>; data: T; rowIndex: number; }
+interface ValidatorContext<T, K> {
+  column: ColumnConfiguration<T, K>;
+  data: T;
+  rowIndex: number;
+  localize?: (key: GridLocaleKey, params?: LocaleParams) => string;   // 4.0; absent outside a grid
+}
+
+// 4.0: a custom validator can reuse a translated message through the grid's localeText
+const endRequiredWithStart = custom<Booking>((value, ctx) =>
+  ctx.data.start && value == null
+    ? (ctx.localize?.('validation.required') ?? 'This field is required')
+    : null);
 ```
+
+Called without a `message`, the built-ins report the `validation.required`, `validation.min`, `validation.max` and `validation.pattern` locale keys (4.0) through `ctx.localize`, so `localeText` (or `esLocale`) translates them. On 3.x those messages were English whatever `localeText` said.
 
 `rowIndex` is view-relative, or -1 for a pinned row or a record on another page (3.6). In row edit mode `ctx.data` is the **staged row** (3.6): a copy of the record (same prototype) with the row's staged values applied, so a cross-field rule judges the row being saved rather than the stored record. A row commit also re-validates the row's other editable cells against it.
 
@@ -219,6 +247,19 @@ await grid.unpinColumn('actions');       // = pinColumn(key, null)
 
 `gotoPage` / `setPageSize` / `nextPage` / `previousPage` / `firstPage` / `lastPage` emit `pageChanging` → `pageChanged`. `setQuickFilter` emits `quickFilterChanging` → `quickFilterChanged`, plus (3.6) `pageChanged` when it moves the grid back to the first page. Since 3.6 the `*-ed` events fire after the pipeline run they caused, so awaiting the returned promise, or reading `grid.pageItems` in the listener, sees the new rows even with an async pipeline hook. `pinColumn` / `unpinColumn` emit `columnPinning` → `columnPinned` and only change the visual render order (the `columns` array isn't reordered).
 
+Since 4.0 `pageChanged` reports the change that was applied, so two quick `nextPage()` calls report page 2 and then page 3, and a local page change no longer reruns sort / filter (custom hooks are not called; remote mode still reruns). A page size or quick filter cancelled through `pageChanging` / `quickFilterChanging` no longer leaves the selector or search box showing the refused value.
+
+**Paginator layout (4.0).** `pagination.paginator: 'full'` (default) shows the page size select, the "1-25 of 100" summary, first, previous, "page / count", next and last, and drops the select, then first / last, when the grid is too narrow, so previous and next stay reachable. `'compact'` always uses that narrow layout. Every paginator and toolbar part is styleable from outside (`paginator-button`, `paginator-prev`, `search-input`, ...; full list in SKILL.md §1.3). A `pageSize` missing from `pageSizeOptions` now appears in the selector.
+
+```ts
+grid.pagination = { enabled: true, pageSize: 10, paginator: 'compact' };
+```
+
+```css
+apex-grid::part(paginator-info)   { font-variant-numeric: tabular-nums; }
+apex-grid::part(paginator-button) { border-radius: 999px; }
+```
+
 ## Localization — `localeText`
 
 Every built-in UI string (pagination, filter operators, toolbar, row/selection labels) is localizable through a `GridLocaleText` map keyed by dot-namespaced `GridLocaleKey`s. Partial maps are valid — any omitted key falls back to the English default.
@@ -234,9 +275,19 @@ grid.localize('pagination.summary', { start: 1, end: 25, total: 100 });   // res
 
 Exports: `EN_LOCALE` (the default dictionary / source of truth for keys), `esLocale` (ready-made Spanish), `interpolate` (`{token}` substitution), `localize`, and the types `GridLocaleKey` / `GridLocaleText` / `LocaleParams`. `grid.localize(key, params?, fallback?)` applies any `localeText` override over the English default and interpolates `{placeholder}` tokens; `fallback` covers keys outside the built-in set (e.g. a custom operand label).
 
-**3.4 key changes** (both English and Spanish): the accessibility work added live-region announcement keys (`announce.*`, e.g. `announce.sortedAscending`, `announce.page`, `announce.rowSelected`, `announce.undoOne`), header control / sort-state labels (`header.*`, e.g. `header.sortedAscending`, `header.filterColumn`, `header.columnMenu`), the host label `grid.label` ("Data grid"), and `editor.rating`. The `ai.noAdapter` key was **removed** (drop it from any `localeText` override you kept). `EN_LOCALE` remains the source of truth for the full, current key list.
+**3.4 key changes** (both English and Spanish): the accessibility work added live-region announcement keys (`announce.*`, e.g. `announce.sortedAscending`, `announce.page`, `announce.rowSelected`, `announce.undoOne`), header control / sort-state labels (`header.*`, e.g. `header.sortedAscending`, `header.filterColumn`, `header.columnMenu`), the grid label `grid.label` ("Data grid"; since 4.0 on the inner `[part~="table"]` element, not the host), and `editor.rating`. The `ai.noAdapter` key was **removed** (drop it from any `localeText` override you kept). `EN_LOCALE` remains the source of truth for the full, current key list.
 
 **3.6 key additions** (English and Spanish) are used only by enterprise panels: `toolPanel.valueColumn`, `toolPanel.columnLabelColumn`, `chart.mapCategoryNone`, `setFilter.more`, `pivot.columnsTruncated`. A partial `localeText` map needs none of them; a full translation typed as `Record<GridLocaleKey, string>` must add them to compile.
+
+**4.0 key additions** (English and Spanish; each English default is the text shown before, and `esLocale` translates them all). Text that stayed English whatever `localeText` said now has keys: `toolbar.exportCsv` (the CSV export menu item), `filter.and` / `filter.or` (the filter panel's join toggles), `cell.rating` (a rating's accessible name, `{value} of {max}`), `cell.true` / `cell.false` (a boolean cell's accessible name), and `validation.required`, `validation.min`, `validation.max` (`{limit}`), `validation.pattern` (the built-in validators' default messages). Keys read only by `apex-grid-enterprise`: `filterBuilder.true` / `filterBuilder.false`, `contextMenu.groupBy`, `contextMenu.ungroupAll`, `contextMenu.expandGroups`, `contextMenu.collapseGroups`, `ai.cancelled`, `chart.rangeResized`. As with 3.6, a full `Record<GridLocaleKey, string>` translation must add them to compile. A filter chip for a condition with no value now shows its `filter.operator.*` label ("Not empty") instead of the operator id.
+
+```ts
+grid.localeText = {
+  'toolbar.exportCsv': 'CSV herunterladen',
+  'validation.min': 'Mindestens {limit}',
+  'cell.true': 'ja', 'cell.false': 'nein',
+};
+```
 
 ## Column menu & column separator
 

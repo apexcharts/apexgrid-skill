@@ -20,13 +20,14 @@ AI models routinely get web-component grid code wrong: they treat `<apex-grid>` 
 
 ### Coverage
 
-- **Quickstart**: register + size the host (`setup()` does both); no theme import, since the grid self-styles via `--ag-*` CSS variables; the free `apex-grid/ignite-ui` add-on (apex-grid 4.0 only, now `4.0.0-beta.2` on the npm `next` tag) follows an Ignite UI theme
+- **Quickstart**: register + size the host (`setup()` does both); no theme import, since the grid self-styles via `--ag-*` CSS variables; the free `apex-grid/ignite-ui` add-on (apex-grid 4.0) follows an Ignite UI theme
+- **Upgrading from 3.x to 4.0**: row recycling and `ctx.data`, the grid role on `[part~="table"]`, pagination and validator changes
 - **Custom-element registration** — `setup()`, `import 'apex-grid/define'`, or `ApexGrid.register()`
 - **Generic `ColumnConfiguration<T>`** — `key`, the 13 column `type`s (incl. `date`, `select`, `currency`, …), templates, `sort`, `filter`, `pinned`, explicit widths
 - **Lit cell, header & editor templates** with the right context shapes
 - **Sort, filter & quick-filter** — programmatic API, UI events, operands, multi-column
 - **Editing, selection, pagination, tree & master-detail** — the opt-in feature config objects
-- **Server-side data** — `dataPipelineConfiguration` async hooks (sort/filter/pagination/quickFilter)
+- **Server-side data**: `dataPipelineConfiguration` async hooks (sort/filter/quickFilter) and remote pagination
 - **CSV export & column reordering/pinning**
 - **Virtualization** — `grid.rows` vs `grid.dataView` vs `grid.totalItems`
 - **Vanilla JS** — full setup without using Lit's `render()` in app code

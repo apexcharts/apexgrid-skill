@@ -36,7 +36,7 @@ interface BaseColumnConfiguration<T extends object, K extends keyof T = keyof T>
   shape?: 'square' | 'circle';                     // 'image' (def 'square')
   alt?: string;                                    // 'image' alt text
   currency?: string;                               // 'currency' ISO 4217 (def 'USD')
-  locale?: string;                                 // 'currency' BCP 47 locale
+  locale?: string;                                 // 'currency' BCP 47 locale; 4.0: also the separators for numbers typed into the filter panel, or checked by min() and max() (enterprise: paste, advanced filter)
   badgeVariant?: 'gold' | 'brand' | 'neutral' | 'muted' | ((v) => …);  // 'badge'
   statusVariant?: 'active' | 'trial' | 'churn' | ((v) => …);           // 'status'
   showDelta?: boolean;                             // 'sparkline' (def true)
@@ -100,15 +100,36 @@ Receives `ApexCellContext<T, K>`:
 
 ```ts
 interface BaseApexCellContext<T, K> {
-  parent: ApexGridCell<T>;          // <apex-grid-cell> element
-  row:    ApexGridRow<T>;           // <apex-grid-row> element; the record is row.data
+  readonly data: T;                 // 4.0: the record this cell was rendered for; stays it after an await
+  parent: ApexGridCell<T>;          // <apex-grid-cell> element (may later show another record)
+  row:    ApexGridRow<T>;           // <apex-grid-row> element (may later show another record)
   column: ColumnConfiguration<T, K>;
   value:  T[K];                     // T[K] — fully typed
-  commit?: (value: T[K]) => Promise<boolean>;   // editable columns only: write without opening the editor
+  commit?: (value: T[K]) => Promise<boolean>;   // editable columns only: write without opening the editor; writes to ctx.data
 }
 ```
 
-Since 3.6 a `cellTemplate` runs again for every visible row, body and pinned, after each pipeline run (sort, filter, quick filter, edit, tree toggle), so a template that reads other fields of `row.data` stays current after an edit to another cell. Keep templates cheap; plain and typed cells are not re-rendered this way. In row edit mode, `commit(value)` stages the value with the row edit instead of writing straight to the record (3.6), so `cancelEdit()` rolls it back.
+`ApexEditorContext` extends it with `commit(value)` and `cancel()`, so an `editorTemplate` gets `ctx.data` too. Unlike the cell context's `commit`, the editor's `commit` commits whichever cell is in edit when it is called, so do not call it after an `await` that can outlive the edit.
+
+### Row recycling (Changed in 4.0.0)
+
+Body rows are recycled by default (`grid.rowRecycling`, default `true`): a scroll, sort or filter re-binds the rendered row elements to the records now in view instead of building new rows, which makes long jumps and sorts cheaper on large grids. A row element and its cells can therefore show another record later. Templates must:
+
+- **derive what they render from the context on each render**, and read the record from `ctx.data` (on 3.x the usual spelling was `ctx.row.data`, which now reads whatever record the element shows at that moment);
+- **not hold `ctx.row` or `ctx.parent` across an `await`** (a `ctx.commit` after an `await` is safe: it writes to `ctx.data`);
+- **not keep state in the elements they create** (an input's typed value, a third-party widget), or wrap the template in `keyed(ctx.data, ...)` so the state never shows on the wrong record.
+
+```ts
+import { html } from 'lit';
+import { keyed } from 'lit/directives/keyed.js';
+
+{ key: 'notes',
+  cellTemplate: (ctx) => keyed(ctx.data, html`<my-rich-note .value=${ctx.value}></my-rich-note>`) }
+```
+
+To keep record-keyed rows (each element stays with its record), opt out: `grid.rowRecycling = false` or `<apex-grid row-recycling="false">`. Detail panel content follows its record and keeps its DOM state without any change, and a grid created inside a `detailTemplate` keeps its own setting. Pinned rows are not recycled, but a pinned band can re-bind its elements (when a row above is unpinned), which is why `ctx.data` is the safe read everywhere.
+
+Since 3.6 a `cellTemplate` runs again for every visible row, body and pinned, after each pipeline run (sort, filter, quick filter, edit, tree toggle), so a template that reads other fields of `ctx.data` stays current after an edit to another cell. Keep templates cheap; plain and typed cells are not re-rendered this way. In row edit mode, `commit(value)` stages the value with the row edit instead of writing straight to the record (3.6), so `cancelEdit()` rolls it back.
 
 ```ts
 import { html } from 'lit';
@@ -121,11 +142,11 @@ const columns: ColumnConfiguration<User>[] = [
   { key: 'name',
     cellTemplate: ({ value }) => html`<strong>${value}</strong>` },
 
-  // Conditional render with row context (row is the element, row.data the record)
+  // Conditional render with the record (ctx.data, 4.0)
   { key: 'subscribed', type: 'boolean',
-    cellTemplate: ({ value, row }) => html`
+    cellTemplate: ({ value, data }) => html`
       <input type="checkbox" .checked=${value} disabled />
-      <small>${row.data.name}</small>` },
+      <small>${data.name}</small>` },
 
   // Prefer the built-in type over a template where one exists:
   // `avatar` and `rating` are column types, no template needed.
@@ -176,7 +197,7 @@ import { required, min, max, pattern, custom } from 'apex-grid';
   validators: [custom((value, ctx) => (value === ctx.data.id ? 'Cannot equal id' : null))] }
 ```
 
-Built-in factories: `required(message?)`, `min(limit, message?)`, `max(limit, message?)`, `pattern(regex, message?)`, `custom(fn)`. `min`/`max`/`pattern` pass on empty / non-numeric values, so compose with `required`. In row edit mode `ctx.data` is the staged row (the record with the row's pending values applied) since 3.6, so a cross-field rule such as `ctx.data.end >= ctx.data.start` sees the row being saved. See `references/state-and-features.md` for the `Validator` / `ValidatorContext` shapes and the `cellValidationFailed` payload.
+Built-in factories: `required(message?)`, `min(limit, message?)`, `max(limit, message?)`, `pattern(regex, message?)`, `custom(fn)`. `min`/`max`/`pattern` pass on empty values, so compose with `required`. **Changed in 4.0.0:** `min` / `max` fail a value that is not a number (on 3.x `'abc'` passed both), and read text as typed: full-width digits (`１２３`), the column `locale`'s grouping and decimal separator, and a currency mark. Called without a `message`, the built-ins report the `validation.*` locale keys (4.0), so `localeText` translates them. In row edit mode `ctx.data` is the staged row (the record with the row's pending values applied) since 3.6, so a cross-field rule such as `ctx.data.end >= ctx.data.start` sees the row being saved. See `references/state-and-features.md` for the `Validator` / `ValidatorContext` shapes and the `cellValidationFailed` payload.
 
 **Numeric editing (3.4):** clearing a `number` or `currency` editor now commits `null`, not `NaN`. An empty or unparseable numeric input leaves the cell empty instead of writing `NaN` into the row. Editing also opens from the keyboard now (Enter or F2 on the active cell), not only by pointer; see SKILL.md §5 for the full keyboard model. Separately, a spreadsheet-style error value (an object carrying a `#...` code, such as an enterprise formula engine's `#VALUE!`) renders as its code in typed `number` / `currency` columns rather than coercing to `NaN` and showing an empty cell.
 
@@ -235,7 +256,7 @@ grid.updateColumns([
 { key: 'internalId', hidden: true }
 ```
 
-Column data is still accessible via `grid.dataView` and the cell template's `row` context, but no cell or header is rendered for it. Toggle at runtime via `updateColumns`.
+Column data is still accessible via `grid.dataView` and the cell template's `data` context, but no cell or header is rendered for it. Toggle at runtime via `updateColumns`.
 
 ## Resizable columns
 
@@ -249,8 +270,9 @@ The grid renders a drag handle on the right edge of the column header. Minimum r
 
 | ❌ | ✅ |
 |---|---|
-| `{ key: 'fullName' }` when `fullName` isn't in `T` | Add to `T`, or compute via `cellTemplate: ({ row }) => html\`${row.data.firstName} ${row.data.lastName}\`` |
-| `cellTemplate: ({ row }) => row.name` | `row` is the `<apex-grid-row>` element: read the record as `row.data.name` |
+| `{ key: 'fullName' }` when `fullName` isn't in `T` | Add to `T`, or compute via `cellTemplate: ({ data }) => html\`${data.firstName} ${data.lastName}\`` |
+| `cellTemplate: ({ row }) => row.name` | `row` is the `<apex-grid-row>` element, not the record: read `data.name` (4.0) |
+| Reading `ctx.row.data` after an `await`, or keeping state in a template's elements | With row recycling (4.0 default) the element can show another record by then: read `ctx.data`, use `keyed(ctx.data, ...)`, or set `grid.rowRecycling = false` |
 | `cellTemplate: ({ value }) => \`<b>\${value}</b>\`` (string) | `cellTemplate: ({ value }) => html\`<b>\${value}</b>\`` |
 | `{ key: 'age', sort: true }` (default `type: 'string'`) | Set `type: 'number'` |
 | `{ key: 'created', type: 'string', sort: { comparer } }` to fake dates | `{ key: 'created', type: 'date', format: 'medium' }` — a real type (accepts `Date`/ISO/timestamp) |

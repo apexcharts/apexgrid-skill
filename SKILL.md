@@ -6,18 +6,19 @@ description: >
   troubleshoot a sortable / filterable / paginated / editable / virtualized data
   table with `<apex-grid>`. Covers the register-and-size setup (no theme import —
   the grid styles itself via `--ag-*` CSS variables), the optional free
-  `apex-grid/ignite-ui` add-on that follows an Ignite UI theme (apex-grid 4.0
-  pre-release only, `apex-grid@next`), the generic
+  `apex-grid/ignite-ui` add-on that follows an Ignite UI theme, the generic
   `ColumnConfiguration<T>` shape with its 13 column types, Lit `cellTemplate`
-  requirements, theming and dark mode (`--ag-*` / `--ag-dark-*` tokens,
-  `theme="dark"`), sorting / filtering / quick-filter, pagination, inline
-  editing, row selection, master-detail and tree rows, CSV export, batch writes
-  via `applyEdits`, right-to-left layout, the UI-only event model, and the
-  `dataPipelineConfiguration` hooks for server-side data.
+  requirements (read the record from `ctx.data`; body rows are recycled),
+  theming and dark mode (`--ag-*` / `--ag-dark-*` tokens, `theme="dark"`),
+  sorting / filtering / quick-filter, pagination (full or compact paginator),
+  inline editing, row selection, master-detail and tree rows, CSV export, batch
+  writes via `applyEdits`, right-to-left layout, the UI-only event model, the
+  `dataPipelineConfiguration` hooks for server-side data, and upgrading from
+  apex-grid 3.x to 4.0.
 metadata:
   author: ApexCharts
   version: "2.5.0"
-  library_version: "3.6.0"
+  library_version: "4.0.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -39,9 +40,9 @@ npm install apex-grid lit
 
 That is the whole install. `apex-grid` brings its own runtime dependencies (`lit`, `@lit/context`, `@lit-labs/virtualizer`) and there is **no theme CSS to import** from anywhere.
 
-> **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly. An Ignite UI theme on the page never fully themed the grid: through 3.x it only tinted the brand and replaced the font. From 4.0 the only way to make the grid follow an Ignite UI theme is the `apex-grid/ignite-ui` add-on, which exists only in apex-grid 4.0 (in pre-release as `4.0.0-beta.2` on the npm `next` tag, §1.3).
+> **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly. An Ignite UI theme on the page never fully themed the grid: through 3.x it only tinted the brand and replaced the font. From 4.0 the only way to make the grid follow an Ignite UI theme is the `apex-grid/ignite-ui` add-on (§1.3).
 
-> Confirmed working versions: `apex-grid@3.6.0`, `lit@^3.0.0`. The `apex-grid/ignite-ui` add-on (§1.3) is the exception: it exists only in `apex-grid@4.0.0-beta.2`, installed with `npm install apex-grid@next`. Plain `npm install apex-grid` gets 3.6.0, which has no add-on.
+> Confirmed working versions: `apex-grid@4.0.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.9.0`, which needs apex-grid 4.0). 4.0 is a major version: moving an app from 3.x, read §1.6 first.
 
 ### 1.2 Register the element + size the host — `setup()` does both
 
@@ -102,18 +103,17 @@ apex-grid[theme~='dark'] { --ag-grid-shadow: var(--ag-dark-shadow-card); } /* th
 
 **CSS parts.** Since 3.6.0 every part a body row renders is reachable with `apex-grid::part(...)`: `cell`, `selection-cell`, `selection-checkbox`, `expansion-cell`, `expansion-toggle`, `expansion-chevron`, `detail-panel`, `row-number-cell`, `row-number`, `reorder-handle-cell`, `reorder-handle`, `reorder-grip`. Before, only `cell` was. Parts inside your own `detailTemplate` content are reached by listing them in `expansion.exportParts` (`references/state-and-features.md`).
 
-> The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables (and the `theme="dark"` attribute) instead, and to follow an Ignite UI theme, the `apex-grid/ignite-ui` add-on below.
+Since 4.0.0 the paginator and toolbar parts are reachable too. Paginator: `paginator-host` (the element), `paginator`, `paginator-size`, `paginator-info`, `paginator-controls`, `paginator-page`, `paginator-button` (every button) plus one part per button, `paginator-first`, `paginator-prev`, `paginator-next`, `paginator-last`. Toolbar: `toolbar-host`, `toolbar`, `toolbar-search`, `search-field`, `search-icon`, `search-input`, `toolbar-actions`, `toolbar-action`, `export`, `export-trigger`, `export-icon`, `export-caret`, `export-menu`, `export-menu-item`. Also new: `table` (the element with the grid role) and `drag-ghost` (the column drag ghost).
 
-**Ignite UI theming (apex-grid 4.0 pre-release only: `4.0.0-beta.2` on the npm `next` tag).** The add-on is not in 3.6.0, the version `npm install apex-grid` installs, and `import 'apex-grid/ignite-ui'` does not resolve there. Install the pre-release first:
-
-```bash
-npm install apex-grid@next lit            # apex-grid 4.0.0-beta.2
-npm install apex-grid-enterprise@next      # only if you use it: 0.9.0-beta.2, needs the 4.0 beta
+```css
+apex-grid::part(paginator-button) { border-radius: 999px; }
+apex-grid::part(paginator-next)   { font-weight: 600; }
+apex-grid::part(search-input)     { font-size: 14px; }
 ```
 
-4.0 is a major version with other breaking changes besides theming (body rows are recycled by default through `rowRecycling`; the grid role and ARIA attributes moved off the host onto the inner `[part~="table"]` element), so read the package CHANGELOG before moving an app to it. The rest of this skill describes 3.6.0.
+> The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables (and the `theme="dark"` attribute) instead, and to follow an Ignite UI theme, the `apex-grid/ignite-ui` add-on below.
 
-To make grids follow an Ignite UI theme loaded on the page, import the add-on once. It is free and needs no licence key.
+**Ignite UI theming (new in 4.0.0).** The add-on ships with apex-grid 4.0; on 3.x `import 'apex-grid/ignite-ui'` does not resolve. To make grids follow an Ignite UI theme loaded on the page, import the add-on once. It is free and needs no licence key.
 
 ```ts
 import 'apex-grid/ignite-ui';
@@ -126,10 +126,10 @@ Every grid on the page, in the document or any shadow root, then follows the the
 - **Per grid:** `design-system="off"` (property `designSystem = false`) turns the Ignite UI colours and font off (the variant still picks the mode); `tokens="off"` (`tokens = false`) turns off the `--apx-*` tokens and Ignite UI together, the variant included, for the grid and the content it renders.
 - **No `refreshTokens()` needed:** the grid follows the cascade live.
 - **Your own CSS:** while the add-on is loaded, the tokens that follow Ignite UI (text, lines, surfaces, header, state colours, pinned edge) leave the root defaults, so page CSS that reads one needs its own fallback: `var(--ag-text, #111827)`.
-- **Enterprise popups:** new tokens `--ag-overlay` and `--ag-overlay-text` (dark grids: `--ag-dark-overlay`, `--ag-dark-overlay-text`) colour the `apex-grid-enterprise` popups (apex-grid-enterprise `0.9.0-beta.2`, also on `next`); unset, each keeps its built-in colours. For the enterprise chart panel to read the theme itself, also import `apexcharts/features/ignite-ui` (ApexCharts 8.8.0 or later; the grid never loads it).
+- **Enterprise popups:** new tokens `--ag-overlay` and `--ag-overlay-text` (dark grids: `--ag-dark-overlay`, `--ag-dark-overlay-text`) colour the `apex-grid-enterprise` popups (apex-grid-enterprise 0.9.0); unset, each keeps its built-in colours. For the enterprise chart panel to read the theme itself, also import `apexcharts/features/ignite-ui` (ApexCharts 8.8.0 or later; the grid never loads it).
 - **`--ag-font`:** in 4.0 an `--ag-font` you set wins over the family and Ignite UI fonts, and it no longer has a root default (the built-in Inter stack is unchanged inside the grid), so page CSS that reads it needs a fallback, as with `--ag-brand`.
 
-> **Breaking in 4.0 (already in `4.0.0-beta.2`):** the grid no longer reads Ignite UI tokens by itself. Through 3.x an Ignite UI theme on the page re-tinted the brand (`--ig-primary-500`, `--ig-primary-700`) and replaced the font (`--ig-font-family`) with no import. From 4.0 an Ignite UI stylesheet changes nothing until you `import 'apex-grid/ignite-ui'`, which brings the brand and font back along with the rest of the theme. The 4.0 grid also follows the family `--apx-*` tokens: a page that sets them on `:root` for its charts sees the grid follow them too (set the matching `--ag-*` tokens to keep the grid as it was).
+> **Breaking in 4.0.0:** the grid no longer reads Ignite UI tokens by itself. Through 3.x an Ignite UI theme on the page re-tinted the brand (`--ig-primary-500`, `--ig-primary-700`) and replaced the font (`--ig-font-family`) with no import. From 4.0 an Ignite UI stylesheet changes nothing until you `import 'apex-grid/ignite-ui'`, which brings the brand and font back along with the rest of the theme. The 4.0 grid also follows the family `--apx-*` tokens: a page that sets them on `:root` for its charts sees the grid follow them too (set the matching `--ag-*` tokens to keep the grid as it was).
 
 ### 1.4 Minimal example — a styled, sortable, filterable table
 
@@ -175,6 +175,20 @@ If rows don't render at all, it's almost always the host height (§1.2). If the 
 
 > **Dev-server reminder.** ES module imports need an HTTP server — opening via `file://` fails with CORS errors. Use Vite (`npm create vite@latest`), any static server, or your framework's dev server.
 
+### 1.6 Upgrading from 3.x (4.0.0)
+
+4.0 is a major version. Check these when moving an app from 3.6:
+
+- **Body rows are recycled by default** (`rowRecycling`, default `true`). A scroll, sort or filter re-binds the rendered row elements to the records now in view, so a row element and its cells can show another record later. In `cellTemplate` / `editorTemplate`, read the record from `ctx.data` (not `ctx.row.data`), derive everything from the context on each render, and do not hold `ctx.row`, `ctx.parent` or `grid.rows` elements across an `await` or a scroll. A template that keeps element state (an input's typed value, a third-party widget) can wrap itself in `keyed(ctx.data, ...)` (`lit/directives/keyed.js`), or opt the grid out with `grid.rowRecycling = false` (attribute `row-recycling="false"`) for record-keyed rows. Detail panels follow their record and need no change.
+- **The grid role moved off the host.** `role` (`grid`, or `treegrid` for tree, master-detail and grouped grids), `aria-rowcount`, `aria-colcount`, `aria-multiselectable` and the accessible name are on the inner `[part~="table"]` element. An `aria-label` / `aria-labelledby` on the host still names the grid and `aria-describedby` describes it. Tests that read these from the host query `grid.shadowRoot.querySelector('[part~="table"]')`.
+- **An Ignite UI theme does nothing until you `import 'apex-grid/ignite-ui'`** (3.x took its brand and font on its own), and **`--ag-font` has no root default**: page CSS that reads it writes `var(--ag-font, Inter, sans-serif)` (§1.3).
+- **Pagination.** Pinned rows no longer count toward `totalItems`, `pageCount` or the summary (they show on every page). A local page change no longer reruns the pipeline, so custom `sort` / `filter` hooks are not called on it (remote mode still reruns). `DataPipelineConfiguration.pagination` and the `'pagination'` value of `DataPipelineParams.type` are removed: the hook was never called, but TypeScript that sets it stops compiling. For server paging use `pagination.mode: 'remote'` (`references/data-pipeline.md`).
+- **`min()` and `max()` fail a value that is not a number.** On 3.x text such as `'abc'` passed both. Empty values still pass.
+- **Smaller type and DOM changes:** `ctx.data` is a required field of the cell context (code that builds one by hand supplies it), `ApexGridPaginator.pageSizeOptions` is `readonly number[]`, the paginator's previous button id is `prev` (was `previous`), and the protected `ApexGrid.headerRowCount` and `ApexGridHeaderRow.renderDragGhost` are gone (subclasses only).
+- **Noticeable, not breaking:** `pageItems` keeps the same array while nothing that shapes it changes; the column header row is no longer a Tab stop; the column menu opens in the top layer (it can extend outside the grid's box); a page change is announced once.
+
+New in 4.0: `showHeader`, `selection.isRowSelectable`, `pagination.paginator: 'compact'` (§5), `::part()` for every paginator and toolbar part (§1.3), `ctx.data` (§4), the Ignite UI add-on and the family `--apx-*` tokens (§1.3), IME input and numbers typed in full width or with the locale's grouping (§5), and locale keys for text that stayed English (`references/state-and-features.md`).
+
 ---
 
 ## 2. Naming — `apex-grid` vs `<apex-grid>` vs `ApexGrid`
@@ -197,7 +211,7 @@ AI models trained before the package was published may suggest `apexgrid` (no hy
 
 3. **`columns` and `data` are properties, not attributes.** Use property binding (`.columns=${...}` in Lit, `[columns]=` in Angular, `:columns.prop=` in Vue, `el.columns = ...` in vanilla JS). A stringified `columns="[...]"` HTML attribute becomes the literal string and the grid renders nothing.
 
-4. **`column.key` must be a real `keyof T`.** No `field` / `dataIndex` / `accessor` aliases. To display a derived value, compute it in `cellTemplate`, whose `row` is the `<apex-grid-row>` element: the record is `row.data`.
+4. **`column.key` must be a real `keyof T`.** No `field` / `dataIndex` / `accessor` aliases. To display a derived value, compute it in `cellTemplate` from `ctx.data`, the record the cell renders (4.0). `ctx.row` is the `<apex-grid-row>` element, which recycling can re-bind to another record.
 
 5. **Set `type` per column.** The primitive types `'string'`, `'number'`, `'boolean'` drive the default sort comparer, filter operands, and editor. The default is `'string'` — leaving a numeric column unset sorts as strings ("10" before "9"). There are also presentation types — `'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'` — that change rendering while sorting/filtering as their underlying value (§4).
 
@@ -239,7 +253,7 @@ interface ColumnConfiguration<T extends object, K extends keyof T = keyof T> {
   shape?: 'square' | 'circle';             // 'image' crop (default 'square')
   alt?: string;                            // 'image' alt text
   currency?: string;                       // 'currency' ISO 4217 code (default 'USD')
-  locale?: string;                         // 'currency' BCP 47 locale
+  locale?: string;                         // 'currency' BCP 47 locale; 4.0: also how numbers typed into the filter panel, or checked by min() and max(), are read (enterprise: paste, advanced filter)
   badgeVariant?: 'gold' | 'brand' | 'neutral' | 'muted' | ((v) => …);   // 'badge'
   statusVariant?: 'active' | 'trial' | 'churn' | ((v) => …);            // 'status'
   showDelta?: boolean;                     // 'sparkline' trailing delta label (default true)
@@ -287,13 +301,15 @@ grid.filter({ key: 'price', condition: 'greaterThan', searchTerm: 100 });   // a
 
 ### Cell template
 
-Receives `ApexCellContext<T, K>` (`{ parent, row, column, value, commit? }`, where `row` is the `<apex-grid-row>` element and `row.data` the record). Must return a Lit `TemplateResult`:
+Receives `ApexCellContext<T, K>` (`{ data, value, column, parent, row, commit? }`). `data` (4.0) is the record the cell was rendered for; `parent` and `row` are the cell and `<apex-grid-row>` elements. Must return a Lit `TemplateResult`:
 
 ```ts
 import { html } from 'lit';
 
-{ key: 'name', cellTemplate: ({ value, row }) => html`<strong>${value}</strong>` }
+{ key: 'name', cellTemplate: ({ value, data }) => html`<strong>${value}</strong> <small>#${data.id}</small>` }
 ```
+
+> **Changed in 4.0.0:** body rows are recycled by default (`rowRecycling`), so a row element and its cells can show another record after a scroll, sort or filter. Read the record from `ctx.data`, which stays that record even after an `await`; `ctx.row.data` is whatever the element shows now. Do not keep state in the elements a template creates, or wrap it in `keyed(ctx.data, ...)`, or set `grid.rowRecycling = false` (§1.6).
 
 Since 3.6.0 a `cellTemplate` runs again for every visible row after each pipeline run (sort, filter, edit, quick filter, tree toggle), so a template that reads other fields of its row stays current. Keep templates cheap.
 
@@ -338,7 +354,9 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 | `columns` | `ColumnConfiguration<T>[]` | Each entry merged with column defaults. |
 | `autoGenerate` (attr `auto-generate`) | `boolean` | Ignored if `columns` is non-empty. |
 | `sortConfiguration` | `{ multiple, triState }` | Multi-column + tri-state sorting toggles. |
-| `dataPipelineConfiguration` | `{ sort?, filter?, pagination?, quickFilter? }` | Server-side / async hooks (§ data-pipeline). |
+| `dataPipelineConfiguration` | `{ sort?, filter?, quickFilter? }` | Server-side / async hooks (§ data-pipeline). 4.0 removed the never-called `pagination` hook: page on the server with `pagination.mode: 'remote'`. |
+| `rowRecycling` (attr `row-recycling`) | `boolean` | Default `true` (4.0): body row elements are re-bound to other records on scroll, sort and filter. `false` (`row-recycling="false"`) keeps record-keyed rows for templates that hold element state (§1.6). |
+| `showHeader` (attr `show-header`) | `boolean` | Default `true`. `false` (4.0) leaves out the column header row, the column group row and the filter panel, so a short grid (a dashboard tile) gives that room to the rows. Screen readers still announce the column names; sort, filter, widths and the page are kept. While hidden, resizing, the column menu, drag reorder and the header filter button are unavailable. |
 | `quickFilter` (attr `quick-filter`) | `string` | Global substring search across visible columns. |
 | `showQuickFilter` / `showExport` | `boolean` | Toolbar UI toggles for quick-filter input / export menu. |
 | `columnReordering` (attr `column-reordering`) | `boolean` | Drag-reorder headers; per-column opt-out via `reorderable`. |
@@ -354,10 +372,10 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 | `exportFormats` *(getter)* | `readonly { id, label }[]` | Export menu formats (CSV in the community grid). |
 | `sortExpressions` / `filterExpressions` | `…[]` (get/set) | Current state. Assigning **replaces** the whole sort / filter, and `[]` or `null` clears it (3.6; on 3.5 assignment merged and `[]` did nothing). `sort()` / `filter()` add instead. `clearSort()` / `clearFilter()` also clear. |
 | `selectedRows` / `expandedRows` | `T[]` (get/set) | Snapshots; set to replace (goes through cancellable events). |
-| `rows` *(getter)* | `ApexGridRow<T>[]` | **Currently rendered only** (virtualized). |
+| `rows` *(getter)* | `ApexGridRow<T>[]` | **Currently rendered only** (virtualized). With recycling (4.0 default) an element can show another record later: read its `data` each time, never keep it as a handle to a record. |
 | `dataView` *(getter)* | `readonly T[]` | Full post-filter/sort data. |
-| `pageItems` *(getter)* | `readonly T[]` | Current page slice (= `dataView` if no pagination). |
-| `totalItems` / `pageCount` *(getters)* | `number` | Row / page totals. |
+| `pageItems` *(getter)* | `readonly T[]` | Current page slice (= `dataView` if no pagination), without pinned rows. Since 4.0 the same array while nothing that shapes it changes. |
+| `totalItems` / `pageCount` *(getters)* | `number` | Row / page totals. With pagination, pinned rows are not counted (4.0); in remote mode `totalItems` is the `pagination.totalItems` you supply. |
 | `page` / `pageSize` | `number` (get/set) | Current page (0-based) / page size. |
 
 ### Feature config properties (opt-in)
@@ -365,8 +383,8 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 | Property | Shape |
 |---|---|
 | `editing` | `{ enabled, mode?: 'cell' \| 'row', trigger?: 'click' \| 'doubleClick', history?: { enabled, stackSize? } }` — plus per-column `editable: true` |
-| `selection` | `{ enabled, mode?: 'single' \| 'multiple', showCheckboxColumn? }` |
-| `pagination` | `{ enabled, mode?: 'local' \| 'remote', page?, pageSize?, pageSizeOptions?, totalItems? }` |
+| `selection` | `{ enabled, mode?: 'single' \| 'multiple', showCheckboxColumn?, isRowSelectable? }`. `isRowSelectable(row)` (4.0) keeps chosen rows (a pinned total row) out of selection: no checkbox, and clicks, Shift/Ctrl clicks, Space, Select all, `selectRow`, `selectedRows = ...` and `setState` skip them; the header checkbox counts only selectable rows. Unset, every row is selectable, pinned rows included |
+| `pagination` | `{ enabled, mode?: 'local' \| 'remote', page?, pageSize?, pageSizeOptions?, totalItems?, paginator?: 'full' \| 'compact' }`. `'full'` (default) drops the page size select, then first / last, when the grid is narrow; `'compact'` (4.0) always shows summary, previous, page / count, next |
 | `tree` | `{ enabled, getDataPath: (row) => string[], groupColumnKey?, defaultExpanded?, childIndent? }`: flat data, hierarchy derived. Under a filter, the ancestors of a match show as their own rows (3.6) |
 | `expansion` | `{ enabled, detailTemplate: (ctx) => TemplateResult, isExpandable?, showToggleColumn?, exportParts? }`: master-detail. `exportParts` (3.6) re-exports parts used in the detail content |
 | `rowPinning` | `{ enabled }` — sticky top/bottom bands via `pinRow()` / `unpinRow()` |
@@ -374,8 +392,10 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 
 ```ts
 grid.editing    = { enabled: true, mode: 'cell', trigger: 'doubleClick', history: { enabled: true } };
-grid.selection  = { enabled: true, mode: 'multiple', showCheckboxColumn: true };
-grid.pagination = { enabled: true, pageSize: 25 };
+grid.selection  = { enabled: true, mode: 'multiple', showCheckboxColumn: true,
+                    isRowSelectable: (row) => row !== totalRow };      // 4.0
+grid.pagination = { enabled: true, pageSize: 25, paginator: 'compact' }; // 'compact': 4.0
+grid.showHeader = false;                                                 // 4.0: no header rows (dashboard tile)
 grid.rowPinning    = { enabled: true };
 grid.rowReordering = { enabled: true };
 ```
@@ -466,7 +486,11 @@ Keyboard-driven commit (Enter) or cancel (Escape) returns focus to the cell, so 
 
 **Editing behavior:** clearing a `number` or `currency` editor now commits `null` (previously it wrote `NaN`). An empty or unparseable numeric input leaves the cell empty rather than poisoning the row. Since 3.6.0 an open editor stays on the record it was opened for when the data, sort, filter or page change under it, and the edit is cancelled if that record leaves the view; row mode edits a staged copy (`references/state-and-features.md`).
 
-**Announcements:** sorting, filtering, selection, paging, row pinning, row reorder, expansion, and undo / redo each announce through a localized live region, and the host applies a localized `aria-label` ("Data grid") plus `aria-multiselectable` when multi-row selection is on. The strings are locale keys (`announce.*`, `header.*`, `grid.label`, `editor.rating`); override them via `localeText` (see `references/state-and-features.md`).
+**Announcements:** sorting, filtering, selection, paging, row pinning, row reorder, expansion, and undo / redo each announce through a localized live region (a page change once, "Page X of N"). The strings are locale keys (`announce.*`, `header.*`, `grid.label`, `editor.rating`, and since 4.0 `cell.rating`, `cell.true` / `cell.false`); override them via `localeText` (see `references/state-and-features.md`).
+
+> **Changed in 4.0.0:** the `grid` / `treegrid` role, `aria-rowcount`, `aria-colcount`, `aria-multiselectable` (multi-row selection) and the localized accessible name ("Data grid", `grid.label`) are on the inner `[part~="table"]` element, not the `<apex-grid>` host. It holds only the header rows, the pinned row bands and the body, so the toolbar, paginator, filter panel and live region are no longer read as table content. An `aria-label` / `aria-labelledby` you put on the host still names the grid. The column header row is no longer a Tab stop.
+
+**Input methods and typed numbers (4.0):** Japanese, Chinese or Korean input through an IME works in the cell editor, the filter panel and the quick filter: the Enter, Escape and Tab that confirm or cancel a conversion stay with the IME (they do not commit or cancel an edit, close the filter panel or clear the quick filter), and the filter panel and quick filter apply the text once the conversion ends. A number typed in the filter panel, or checked by `min()` / `max()`, is read as a person writes it: full-width digits and signs (`１２３`, `－５`), the grouping and decimal separator of the column's `locale` (else the runtime locale, so `1.234,5` is 1234.5 under `'de-DE'`), and a leading or trailing `¥`, `$`, `€`, `円` or the column currency's symbol. A plain ASCII decimal reads as before in every locale (`1.000` stays 1 even under `'de-DE'`), and other text splits: the filter panel falls back to its leading number as in 3.x (`12.5%` filters by 12.5, `10²` by 10), while `min()` / `max()` read `12.5%` or `10²` as not a number, so the value fails. Programmatic `filter()` search terms are not parsed this way: pass numbers.
 
 **New in 3.5, all automatic:** the grid honours `prefers-reduced-motion` (every transition routes through the `--ag-dur-*` tokens, which zero under the media query), it stays usable under forced colors / Windows High Contrast (the active-cell ring, invalid-cell ring, selected-row bar and focus rings are painted as outlines, which forced colors recolours rather than drops), and interactive targets meet the WCAG 2.2 AA 24x24 minimum. The only visible change is that the paginator bar is 2px taller.
 
@@ -496,7 +520,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 
 ### 3. Importing a theme CSS that no longer exists
 ❌ `import 'igniteui-webcomponents/themes/light/bootstrap.css'` + `setup({ theme: 'bootstrap' })` is obsolete; it never affected the grid, and as of 3.5.0 the option is inert and that package is not even installed.
-✅ Nothing to import for a styled grid: it styles itself; retheme via `--ag-*` CSS variables. The only required CSS is a host **height**. To follow an Ignite UI theme that the page loads, the path is the `apex-grid/ignite-ui` add-on (apex-grid 4.0 only, `npm install apex-grid@next` while it is in pre-release, §1.3), not a theme import into the grid.
+✅ Nothing to import for a styled grid: it styles itself; retheme via `--ag-*` CSS variables. The only required CSS is a host **height**. To follow an Ignite UI theme that the page loads, the path is the `apex-grid/ignite-ui` add-on (apex-grid 4.0, §1.3), not a theme import into the grid.
 
 ### 4. Stringified `columns` attribute
 ❌ `<apex-grid columns="[...]">` — becomes the literal string `"[object Object],..."`.
@@ -504,7 +528,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 
 ### 5. `column.key` not a real key of `T`
 ❌ `{ key: 'fullName' }` when `User` has only `firstName` + `lastName`.
-✅ Compute via template: `cellTemplate: ({ row }) => html\`${row.data.firstName} ${row.data.lastName}\``. The context's `row` is the row element; the record is `row.data`.
+✅ Compute via template: `cellTemplate: ({ data }) => html\`${data.firstName} ${data.lastName}\``. The context's `data` is the record (4.0); `row` is the row element, not the record.
 
 ### 6. String from `cellTemplate`
 ❌ `cellTemplate: ({ value }) => \`<strong>\${value}</strong>\`` — renders as escaped text.
@@ -535,8 +559,16 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 ✅ `apex-grid { --ag-dark-surface: #111827; --ag-dark-text: #f9fafb; }` (or on any ancestor). Brand, sizing and typography tokens are shared, so `--ag-brand` still applies to both.
 
 ### 13. Expecting an Ignite UI theme to restyle the grid without the add-on (4.0)
-❌ Loading an Ignite UI theme stylesheet and expecting the 4.0 grid to follow it: without `apex-grid/ignite-ui` every `--ig-*` token is silently ignored (3.x picked up the brand and font on its own; 4.0 does not). Also ❌ `theme="light"` on a page that switches to a dark Ignite UI theme: the pinned mode blocks the dark variant. Also ❌ `import 'apex-grid/ignite-ui'` after a plain `npm install apex-grid`: that installs 3.6.0, which has no such module.
-✅ `npm install apex-grid@next` (4.0.0-beta.2), then `import 'apex-grid/ignite-ui'` once (free, no licence key) and leave the `theme` attribute off so the grid follows `--ig-theme-variant`. Use `design-system="off"` or `tokens="off"` to opt one grid out.
+❌ Loading an Ignite UI theme stylesheet and expecting the 4.0 grid to follow it: without `apex-grid/ignite-ui` every `--ig-*` token is silently ignored (3.x picked up the brand and font on its own; 4.0 does not). Also ❌ `theme="light"` on a page that switches to a dark Ignite UI theme: the pinned mode blocks the dark variant. Also ❌ `import 'apex-grid/ignite-ui'` on apex-grid 3.x: the module does not exist there.
+✅ apex-grid 4.0, then `import 'apex-grid/ignite-ui'` once (free, no licence key) and leave the `theme` attribute off so the grid follows `--ig-theme-variant`. Use `design-system="off"` or `tokens="off"` to opt one grid out.
+
+### 14. Treating a row element as a record (4.0)
+❌ A click handler in a `cellTemplate` that reads `ctx.row.data` after an `await`, or code that keeps `grid.rows[0]` as a handle: with recycling (the 4.0 default) that element can show another record after a scroll, sort or filter, so the code acts on the wrong row. Also ❌ an `<input>` or third-party widget in a `cellTemplate` that keeps its own typed state: the state shows on another record after a scroll.
+✅ Read `ctx.data` (it stays the record the cell rendered, across an `await`), keep state in your data rather than in the elements, wrap a stateful template in `keyed(ctx.data, html\`...\`)` (`lit/directives/keyed.js`), or set `grid.rowRecycling = false` for record-keyed rows.
+
+### 15. Reading the grid's ARIA from the host (4.0)
+❌ `expect(grid.getAttribute('role')).toBe('grid')` or `grid.getAttribute('aria-rowcount')` in a test: the host no longer carries them.
+✅ `grid.shadowRoot!.querySelector('[part~="table"]')!.getAttribute('role')`. Name the grid with `aria-label` / `aria-labelledby` on the host as before.
 
 ---
 
@@ -544,9 +576,10 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 
 | Topic | Reference File |
 |---|---|
-| Column types, templates, auto-generation, per-column styling, header/editor templates | `references/columns-and-templates.md` |
+| Upgrading an app from 3.x to 4.0 | §1.6 |
+| Column types, templates (`ctx.data`, row recycling), auto-generation, per-column styling, header/editor templates | `references/columns-and-templates.md` |
 | Sort & filter — operands, expressions, multi-column, quick-filter, events | `references/sort-and-filter.md` |
-| Server-side data hooks (sort/filter/pagination/quickFilter), virtualization, `dataView` | `references/data-pipeline.md` |
+| Server-side data hooks (sort/filter/quickFilter), remote pagination, virtualization, `dataView` | `references/data-pipeline.md` |
 | Row pinning / reordering, undo-redo, batch edits (`applyEdits`), validators, row-mode editing, column groups, state & schema (`getState`/`setState`/`getSchema`), localization, export source and CSV escaping, master-detail parts and nested grids (`exportParts`, `ownsEvent`) | `references/state-and-features.md` |
 | End-to-end vanilla JS (no Lit `render`) | `references/vanilla-js.md` |
 | Lit, React, Vue, Angular integration | `references/framework-integration.md` |

@@ -239,7 +239,9 @@ export class UsersGridComponent implements OnInit {
 | ❌ | ✅ |
 |---|---|
 | Forgetting to register the element | Top-level `import 'apex-grid/define'` once in the app entry |
-| Importing an Ignite UI theme + `configureTheme(name)` | Obsolete: the grid self-styles; retheme via `--ag-*` CSS variables. To follow an Ignite UI theme on the page, `import 'apex-grid/ignite-ui'` once in the app entry (apex-grid 4.0 only: `npm install apex-grid@next` while it is in pre-release; free). Without it the 4.0 grid ignores `--ig-*` |
+| Importing an Ignite UI theme + `configureTheme(name)` | Obsolete: the grid self-styles; retheme via `--ag-*` CSS variables. To follow an Ignite UI theme on the page, `import 'apex-grid/ignite-ui'` once in the app entry (apex-grid 4.0; free). Without it the 4.0 grid ignores `--ig-*` |
+| A stateful widget (a framework component mounted into a cell, a third-party picker) inside `cellTemplate` showing the wrong row's state after a scroll or sort | Body rows are recycled by default in 4.0: read the record from `ctx.data`, keep the state in your data, wrap the template in `keyed(ctx.data, ...)`, or set `grid.rowRecycling = false` (`row-recycling="false"`) |
+| `show-header={false}` / `:show-header="false"` expecting a boolean | Boolean attributes such as `show-header` and `row-recycling` turn off only on the string `"false"`; bind the property instead (`.showHeader=${false}`, `:showHeader.prop="false"`, `[showHeader]="false"`, or `el.showHeader = false`) |
 | Pinning `theme="light"` on a page with a dark Ignite UI theme | Leave the `theme` attribute off so the grid follows `--ig-theme-variant`; `design-system="off"` / `tokens="off"` opt one grid out |
 | Forgetting `setup()` / no host-height rule for `apex-grid` | `setup()` registers + sizes the host. Or `import 'apex-grid/define'` + `apex-grid { height: ... }` (never set `display` — it overrides the component's `:host { display: grid }`) |
 | Vue: `:data="data"` (attribute, becomes `"[object Object]"`) | `:data.prop="data"`, or set via `ref` in `onMounted` |
