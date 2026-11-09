@@ -17,7 +17,7 @@ description: >
   apex-grid 3.x to 4.0.
 metadata:
   author: ApexCharts
-  version: "2.5.0"
+  version: "2.6.0"
   library_version: "4.0.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
