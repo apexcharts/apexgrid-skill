@@ -4,7 +4,7 @@ You are working with `apex-grid`, a Lit-based web-component data grid by ApexCha
 Documentation: https://github.com/apexcharts/apexgrid
 NPM: apex-grid (with a hyphen — no `apexgrid` package exists)
 GitHub: https://github.com/apexcharts/apexgrid
-Confirmed versions: apex-grid@4.0.0, lit@^3.3.0 (apex-grid-enterprise@0.9.0 needs apex-grid 4.0).
+Confirmed versions: apex-grid@4.1.0, lit@^3.3.0 (apex-grid-enterprise@0.9.0 needs apex-grid 4.0; apexcharts@8.4.1 or later for a `type: 'chart'` column).
 Upgrading from 3.x: see "Changed in 4.0" at the end.
 
 ## Quickstart — register + size the host
@@ -119,7 +119,7 @@ render(
 2. **Two setup steps:** register the element and give the host a bounded height — `setup()` does both. **No theme CSS import is needed** (the grid self-styles via `--ag-*`).
 3. **`columns` and `data` are properties, not attributes.** Use property binding.
 4. **`column.key` must be a real `keyof T`.** No aliases. Compute derived values in `cellTemplate` from `ctx.data`, the record (4.0); `ctx.row` is the row element, which recycling re-binds to other records.
-5. **Set `type` per column.** Primitive `'string'`/`'number'`/`'boolean'` drive sort/filter/editing (default `'string'`). Presentation types also exist: `'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'`.
+5. **Set `type` per column.** Primitive `'string'`/`'number'`/`'boolean'` drive sort/filter/editing (default `'string'`). Presentation types also exist: `'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'chart'` (4.1: an ApexCharts chart per cell; call `setApexCharts(ApexCharts)` once; do not hand-write a `keyed` chart template), `'status'`.
 6. **`cellTemplate` and `headerTemplate` must return Lit `TemplateResult`s** (`html\`...\``). Strings render as escaped text.
 7. **Sort/filter events fire only for UI-initiated operations.** Programmatic `grid.sort(...)` / `grid.filter(...)` are silent.
 

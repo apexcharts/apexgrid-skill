@@ -40,12 +40,17 @@ interface BaseColumnConfiguration<T extends object, K extends keyof T = keyof T>
   badgeVariant?: 'gold' | 'brand' | 'neutral' | 'muted' | ((v) => …);  // 'badge'
   statusVariant?: 'active' | 'trial' | 'churn' | ((v) => …);           // 'status'
   showDelta?: boolean;                             // 'sparkline' (def true)
+  chart?: {                                        // 'chart' (4.1): an ApexCharts chart per cell
+    type?: string; height?: number; width?: number | string;   // def 'line', 28, '100%'
+    options?: object | ((value, data: T) => object);           // ApexOptions over the row defaults
+    label?: (value, data: T) => string;                         // accessible name
+  };
 }
 ```
 
 ### Column types (`DataType`)
 
-`'string'` / `'number'` / `'boolean'` are the primitive types driving sort, filter, and the default editor. The rest are presentation renderers over a primitive value (and sort/filter as that value): `'select'` (label from `options`, `<select>` editor), `'rating'` (stars, 0..`max`), `'date'` (locale date via `format`; accepts `Date`/ISO/timestamp; `<input type="date">` editor), `'image'` (`<img>`, `shape`/`alt`), `'currency'` (`Intl.NumberFormat`, `currency`/`locale`), `'avatar'`, `'badge'` (`badgeVariant`), `'progress'` (0..`max`), `'sparkline'` (`number[]`, `showDelta`), `'status'` (`statusVariant`). Of these, `'currency'`, `'rating'` and `'progress'` are numeric: since 3.6 they filter with the number operands and export as numbers, like `'number'`.
+`'string'` / `'number'` / `'boolean'` are the primitive types driving sort, filter, and the default editor. The rest are presentation renderers over a primitive value (and sort/filter as that value): `'select'` (label from `options`, `<select>` editor), `'rating'` (stars, 0..`max`), `'date'` (locale date via `format`; accepts `Date`/ISO/timestamp; `<input type="date">` editor), `'image'` (`<img>`, `shape`/`alt`), `'currency'` (`Intl.NumberFormat`, `currency`/`locale`), `'avatar'`, `'badge'` (`badgeVariant`), `'progress'` (0..`max`), `'sparkline'` (`number[]`, `showDelta`), `'chart'` (4.1: an ApexCharts chart per cell, configured with `chart`; needs `setApexCharts(ApexCharts)` or a script-tag global, ApexCharts 8.4.1+), `'status'` (`statusVariant`). Of these, `'currency'`, `'rating'` and `'progress'` are numeric: since 3.6 they filter with the number operands and export as numbers, like `'number'`.
 
 Defaults applied on assignment (`DEFAULT_COLUMN_CONFIG`):
 
@@ -61,7 +66,7 @@ Defaults applied on assignment (`DEFAULT_COLUMN_CONFIG`):
 | `'number'` | numeric `<` / `>` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
 | `'boolean'` | `false < true` | `all`, `true`, `false`, `empty`, `notEmpty` |
 
-The table above lists the three **primitive** types. The presentation types (`'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'`) sort as their underlying value. For filtering, `'currency'`, `'rating'` and `'progress'` take the `'number'` operands (since 3.6; on 3.5 they took the text ones), and the others take the `'string'` operands. With the built-in comparison, empty cells (`null`, `undefined`, `NaN`, invalid `Date`) sort last in both directions (3.6). For dates, use the real `'date'` type: it accepts `Date`, ISO strings, or millisecond timestamps, renders a locale date (`format`), and sorts chronologically. No timestamp/comparer workaround needed:
+The table above lists the three **primitive** types. The presentation types (`'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'chart'`, `'status'`) sort as their underlying value. For filtering, `'currency'`, `'rating'` and `'progress'` take the `'number'` operands (since 3.6; on 3.5 they took the text ones), and the others take the `'string'` operands. With the built-in comparison, empty cells (`null`, `undefined`, `NaN`, invalid `Date`) sort last in both directions (3.6). For dates, use the real `'date'` type: it accepts `Date`, ISO strings, or millisecond timestamps, renders a locale date (`format`), and sorts chronologically. No timestamp/comparer workaround needed:
 
 ```ts
 { key: 'createdAt', type: 'date', format: 'medium', sort: true, filter: true }
@@ -117,7 +122,7 @@ Body rows are recycled by default (`grid.rowRecycling`, default `true`): a scrol
 
 - **derive what they render from the context on each render**, and read the record from `ctx.data` (on 3.x the usual spelling was `ctx.row.data`, which now reads whatever record the element shows at that moment);
 - **not hold `ctx.row` or `ctx.parent` across an `await`** (a `ctx.commit` after an `await` is safe: it writes to `ctx.data`);
-- **not keep state in the elements they create** (an input's typed value, a third-party widget), or wrap the template in `keyed(ctx.data, ...)` so the state never shows on the wrong record.
+- **not keep state in the elements they create** (an input's typed value, a third-party widget), or wrap the template in `keyed(ctx.data, ...)` so the state never shows on the wrong record. For an ApexCharts chart, use `type: 'chart'` (4.1) instead: it keeps one chart per cell and re-points it, where `keyed` builds a new chart every time a row shows another record (thousands per scroll on a large grid).
 
 ```ts
 import { html } from 'lit';

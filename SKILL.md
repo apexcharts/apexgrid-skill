@@ -7,7 +7,8 @@ description: >
   table with `<apex-grid>`. Covers the register-and-size setup (no theme import —
   the grid styles itself via `--ag-*` CSS variables), the optional
   `apex-grid/ignite-ui` add-on (no extra licence key) that follows an Ignite UI theme, the generic
-  `ColumnConfiguration<T>` shape with its 13 column types, Lit `cellTemplate`
+  `ColumnConfiguration<T>` shape with its 14 column types (incl. the 4.1
+  `chart` type, an ApexCharts chart per cell), Lit `cellTemplate`
   requirements (read the record from `ctx.data`; body rows are recycled),
   theming and dark mode (`--ag-*` / `--ag-dark-*` tokens, `theme="dark"`),
   sorting / filtering / quick-filter, pagination (full or compact paginator),
@@ -17,8 +18,8 @@ description: >
   apex-grid 3.x to 4.0.
 metadata:
   author: ApexCharts
-  version: "2.6.1"
-  library_version: "4.0.0"
+  version: "2.7.0"
+  library_version: "4.1.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -42,7 +43,7 @@ That is the whole install. `apex-grid` brings its own runtime dependencies (`lit
 
 > **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly. An Ignite UI theme on the page never fully themed the grid: through 3.x it only tinted the brand and replaced the font. From 4.0 the only way to make the grid follow an Ignite UI theme is the `apex-grid/ignite-ui` add-on (§1.3).
 
-> Confirmed working versions: `apex-grid@4.0.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.9.0`, which needs apex-grid 4.0). 4.0 is a major version: moving an app from 3.x, read §1.6 first.
+> Confirmed working versions: `apex-grid@4.1.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.9.0`, which needs apex-grid 4.0; `apexcharts@8.4.1` or later for a `type: 'chart'` column). 4.0 is a major version: moving an app from 3.x, read §1.6 first.
 
 ### 1.2 Register the element + size the host — `setup()` does both
 
@@ -119,7 +120,7 @@ apex-grid::part(search-input)     { font-size: 14px; }
 import 'apex-grid/ignite-ui';
 ```
 
-Every grid on the page, in the document or any shadow root, then follows the theme, including grids that connected before the import: the brand (`--ig-primary-*`), text and muted text, gridlines and the pinned-column edge, the header (`--ig-surface-raised`, Ignite UI 7.5+), the state colours, the font, and the `apex-grid-enterprise` popups (`--ig-surface-overlay`, 7.5+). Card and row surfaces keep the grid's own light or dark background. The add-on registers on a shared `globalThis` slot, so it reaches grids from a separately built bundle too. The grid ships as ES modules only: load it from your bundle or a `<script type="module">`.
+Every grid on the page, in the document or any shadow root, then follows the theme, including grids that connected before the import: the brand (`--ig-primary-*`), text and muted text, gridlines and the pinned-column edge, the header (`--ig-surface-raised`, Ignite UI 7.5+), the state colours, the font, and the `apex-grid-enterprise` popups (`--ig-surface-overlay`, 7.5+). Since 4.0.1 the card and rows take the theme's surface too (`--ig-surface-base` on Ignite UI 7.5, else `--ig-surface-500`); on a 7.4 theme the header, toolbar and paginator are that surface moved slightly toward the text, and on a dark 7.4 theme the `apex-grid-enterprise` popups take the same colour. A grid whose `theme` differs from the theme's variant (`theme="light"` under a dark theme, or the reverse) keeps its built-in surface, and an `--ag-surface`, `--ag-dark-surface` or `--apx-surface` you set still wins. The add-on registers on a shared `globalThis` slot, so it reaches grids from a separately built bundle too. The grid ships as ES modules only: load it from your bundle or a `<script type="module">`.
 
 - **Ranking**, highest first: an `--ag-*` token you set > the family `--apx-*` tokens (`--apx-accent`, `--apx-fore`, `--apx-grid`, `--apx-surface`, `--apx-font-family`, `--apx-radius-factor`, also new in that release) > Ignite UI > built-in values. (Across the Apex family: explicit option > product CSS variable > `--apx-*` > named theme/palette > `--ig-*` > defaults.)
 - **Mode:** a grid without a `theme` attribute follows the Ignite UI variant (`--ig-theme-variant`) declared on `:root` or an ancestor, live, on a theme swap too. `theme="light"` keeps a grid light and `theme="dark"` keeps it dark, so do not pin `theme="light"` if the grid should go dark with a dark Ignite UI theme.
@@ -179,7 +180,7 @@ If rows don't render at all, it's almost always the host height (§1.2). If the 
 
 4.0 is a major version. Check these when moving an app from 3.6:
 
-- **Body rows are recycled by default** (`rowRecycling`, default `true`). A scroll, sort or filter re-binds the rendered row elements to the records now in view, so a row element and its cells can show another record later. In `cellTemplate` / `editorTemplate`, read the record from `ctx.data` (not `ctx.row.data`), derive everything from the context on each render, and do not hold `ctx.row`, `ctx.parent` or `grid.rows` elements across an `await` or a scroll. A template that keeps element state (an input's typed value, a third-party widget) can wrap itself in `keyed(ctx.data, ...)` (`lit/directives/keyed.js`), or opt the grid out with `grid.rowRecycling = false` (attribute `row-recycling="false"`) for record-keyed rows. Detail panels follow their record and need no change.
+- **Body rows are recycled by default** (`rowRecycling`, default `true`). A scroll, sort or filter re-binds the rendered row elements to the records now in view, so a row element and its cells can show another record later. In `cellTemplate` / `editorTemplate`, read the record from `ctx.data` (not `ctx.row.data`), derive everything from the context on each render, and do not hold `ctx.row`, `ctx.parent` or `grid.rows` elements across an `await` or a scroll. For an ApexCharts chart per row use `type: 'chart'` (4.1, §4), which handles recycling itself. A template that keeps element state (an input's typed value, a third-party widget) can wrap itself in `keyed(ctx.data, ...)` (`lit/directives/keyed.js`), or opt the grid out with `grid.rowRecycling = false` (attribute `row-recycling="false"`) for record-keyed rows. Detail panels follow their record and need no change.
 - **The grid role moved off the host.** `role` (`grid`, or `treegrid` for tree, master-detail and grouped grids), `aria-rowcount`, `aria-colcount`, `aria-multiselectable` and the accessible name are on the inner `[part~="table"]` element. An `aria-label` / `aria-labelledby` on the host still names the grid and `aria-describedby` describes it. Tests that read these from the host query `grid.shadowRoot.querySelector('[part~="table"]')`.
 - **An Ignite UI theme does nothing until you `import 'apex-grid/ignite-ui'`** (3.x took its brand and font on its own), and **`--ag-font` has no root default**: page CSS that reads it writes `var(--ag-font, Inter, sans-serif)` (§1.3).
 - **Pagination.** Pinned rows no longer count toward `totalItems`, `pageCount` or the summary (they show on every page). A local page change no longer reruns the pipeline, so custom `sort` / `filter` hooks are not called on it (remote mode still reruns). `DataPipelineConfiguration.pagination` and the `'pagination'` value of `DataPipelineParams.type` are removed: the hook was never called, but TypeScript that sets it stops compiling. For server paging use `pagination.mode: 'remote'` (`references/data-pipeline.md`).
@@ -213,7 +214,7 @@ AI models trained before the package was published may suggest `apexgrid` (no hy
 
 4. **`column.key` must be a real `keyof T`.** No `field` / `dataIndex` / `accessor` aliases. To display a derived value, compute it in `cellTemplate` from `ctx.data`, the record the cell renders (4.0). `ctx.row` is the `<apex-grid-row>` element, which recycling can re-bind to another record.
 
-5. **Set `type` per column.** The primitive types `'string'`, `'number'`, `'boolean'` drive the default sort comparer, filter operands, and editor. The default is `'string'` — leaving a numeric column unset sorts as strings ("10" before "9"). There are also presentation types — `'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'status'` — that change rendering while sorting/filtering as their underlying value (§4).
+5. **Set `type` per column.** The primitive types `'string'`, `'number'`, `'boolean'` drive the default sort comparer, filter operands, and editor. The default is `'string'`: leaving a numeric column unset sorts as strings ("10" before "9"). There are also presentation types (`'select'`, `'rating'`, `'date'`, `'image'`, `'currency'`, `'avatar'`, `'badge'`, `'progress'`, `'sparkline'`, `'chart'`, `'status'`) that change rendering while sorting/filtering as their underlying value (§4). `'chart'` (4.1) draws an ApexCharts chart per cell.
 
 6. **`cellTemplate` / `headerTemplate` / `editorTemplate` must return Lit `TemplateResult`s** — values from an `` html`...` `` tagged template. Returning a plain string renders as escaped text.
 
@@ -257,6 +258,13 @@ interface ColumnConfiguration<T extends object, K extends keyof T = keyof T> {
   badgeVariant?: 'gold' | 'brand' | 'neutral' | 'muted' | ((v) => …);   // 'badge'
   statusVariant?: 'active' | 'trial' | 'churn' | ((v) => …);            // 'status'
   showDelta?: boolean;                     // 'sparkline' trailing delta label (default true)
+  chart?: {                                // 'chart' (4.1): an ApexCharts chart per cell
+    type?: string;                         //   ApexCharts type (default 'line')
+    height?: number;                       //   px (default 28)
+    width?: number | string;               //   default '100%'
+    options?: object | ((value, data: T) => object);   // ApexOptions merged over the row defaults
+    label?: (value, data: T) => string;    //   accessible name (default '{count} values, {first} to {last}')
+  };
 }
 ```
 
@@ -280,7 +288,23 @@ Applied defaults (`DEFAULT_COLUMN_CONFIG`): `{ type: 'string', resizable: false,
 | `'badge'` | colored pill (`badgeVariant`) |
 | `'progress'` | health bar, 0..`max` (default 100). Numeric |
 | `'sparkline'` | inline trend chart of a `number[]` (`showDelta`) |
+| `'chart'` | an ApexCharts chart per cell (4.1, `chart`): `number[]` or `{ data }[]` series; `pie`/`donut`/`radialBar`/`polarArea` take a `number[]`. Display only. See below |
 | `'status'` | dot + pill (`statusVariant`, or inferred) |
+
+**`type: 'chart'` (4.1.0).** Give the grid the ApexCharts constructor once (ApexCharts 8.4.1 or later; the grid does not depend on it):
+
+```ts
+import ApexCharts from 'apexcharts';
+import { setApexCharts } from 'apex-grid';
+setApexCharts(ApexCharts);   // or load apexcharts with a script tag before the page's load event
+
+grid.columns = [
+  { key: 'name' },
+  { key: 'trend', type: 'chart', chart: { type: 'area', options: { stroke: { width: 2 } } } },
+];
+```
+
+Without either, the cells stay empty and the grid warns once. Defaults suit a row: sparkline mode, no animation, no tooltip (the cell clips it), no toolbar, the grid's brand colour on axis charts and the ApexCharts palette on slices and rings. Each cell keeps one chart through row recycling and re-points it with `updateSeries`, so do **not** hand-write a chart `cellTemplate` with `keyed` for this (that rebuilds a chart per row per scroll). Prefer a plain `options` object: an `options` function costs a full update on every re-bind, and a new chart when a row's options set `yaxis`, change `chart.type` or leave out a key the previous row set. Each cell is `role="img"` with a localised name (`cell.chart` and related locale keys, numbers in the column's `locale`) and adds no tab stop.
 
 > A `'date'` column **does** exist in 3.x — use `type: 'date'` (it accepts `Date`, ISO strings, or millisecond timestamps), not a string column with a custom comparer.
 
@@ -288,7 +312,7 @@ Applied defaults (`DEFAULT_COLUMN_CONFIG`): `{ type: 'string', resizable: false,
 
 | `type` | Operand keys in the filter UI |
 |---|---|
-| `'string'`, and every type not listed below (`select`, `date`, `image`, `avatar`, `badge`, `sparkline`, `status`) | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
+| `'string'`, and every type not listed below (`select`, `date`, `image`, `avatar`, `badge`, `sparkline`, `chart`, `status`) | `contains`, `doesNotContain`, `startsWith`, `endsWith`, `equals`, `doesNotEqual`, `empty`, `notEmpty` |
 | `'number'`, and the numeric types `'currency'`, `'rating'`, `'progress'` | `equals`, `doesNotEqual`, `greaterThan`, `lessThan`, `greaterThanOrEqual`, `lessThanOrEqual`, `empty`, `notEmpty` |
 | `'boolean'` | `all`, `true`, `false`, `empty`, `notEmpty` (all **unary**: no `searchTerm`) |
 
