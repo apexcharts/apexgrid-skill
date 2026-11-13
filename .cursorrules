@@ -152,7 +152,7 @@ interface ColumnConfiguration<T, K extends keyof T> {
 }
 ```
 
-Applied defaults: `{ type: 'string', resizable: false, hidden: false, sort: false, filter: false, exportable: true }`.
+Applied defaults: `{ type: 'string', resizable: false, hidden: false, sort: false, filter: false }` (`exportable` behaves as `true` unless set to `false`).
 
 ### Templates
 

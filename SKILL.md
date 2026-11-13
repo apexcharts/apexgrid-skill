@@ -44,7 +44,7 @@ That is the whole install. `apex-grid` brings its own runtime dependencies (`lit
 
 > **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly. An Ignite UI theme on the page never fully themed the grid: through 3.x it only tinted the brand and replaced the font. From 4.0 the only way to make the grid follow an Ignite UI theme is the `apex-grid/ignite-ui` add-on (§1.3).
 
-> Confirmed working versions: `apex-grid@5.0.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.10.0`, which depends on `apex-grid@^5.0.0`; `apexcharts@8.4.1` or later for a `type: 'chart'` column). 5.0 is a major version that only removes names 4.2 deprecated: moving an app from 4.x, read §1.7; from 3.x, read §1.6 first.
+> Confirmed working versions: `apex-grid@5.0.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.10.0`, which depends on `apex-grid@^5.0.0`; `apexcharts@8.4.1` or later for a `type: 'chart'` column). 5.0 is a major version that removes the names 4.2 deprecated plus `setup({ theme })`, and types `dataPipelineConfiguration` as optional: moving an app from 4.x, read §1.7; from 3.x, read §1.6 first.
 
 ### 1.2 Register the element + size the host — `setup()` does both
 
@@ -621,7 +621,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 ✅ `grid.shadowRoot!.querySelector('[part~="table"]')!.getAttribute('role')`. Name the grid with `aria-label` / `aria-labelledby` on the host as before.
 
 ### 16. Setting the toolbar or paginator text directly, or writing a hook onto the pipeline config (5.0)
-❌ `toolbar.placeholder = 'Find…'`, `debounce="500"`, `paginator.pageSizeLabel = 'Rows'` / `page-size-label`: removed in 5.0 (on 4.x the grid never set them, so they did nothing on its own toolbar and paginator). Also ❌ `grid.dataPipelineConfiguration.sort = fn` on a fresh grid: the property is `undefined` until assigned, so this throws.
+❌ `toolbar.placeholder = 'Find…'`, `debounce="500"`, `paginator.pageSizeLabel = 'Rows'` / `page-size-label`: removed in 5.0 (the grid never set them on the toolbar and paginator it renders). Also ❌ `grid.dataPipelineConfiguration.sort = fn` on a fresh grid: the property is `undefined` until assigned, so this throws.
 ✅ `grid.localeText = { 'toolbar.searchPlaceholder': 'Find…', 'pagination.rowsPerPage': 'Rows' }`; `grid.dataPipelineConfiguration = { ...grid.dataPipelineConfiguration, sort: fn }`.
 
 ---
