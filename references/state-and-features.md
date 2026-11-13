@@ -1,6 +1,6 @@
 # State, Localization & Interaction Features (3.1+)
 
-> Everything here landed in **apex-grid 3.1 and later** on top of the 3.0 API; version tags mark what is newer (up to 4.0). The setup rules from `SKILL.md` (register + bounded host height, no theme import) still apply. Row pinning / reordering, undo-redo, and validators are all **opt-in** via a config object, off by default.
+> Everything here landed in **apex-grid 3.1 and later** on top of the 3.0 API; version tags mark what is newer (up to 5.0). The setup rules from `SKILL.md` (register + bounded host height, no theme import) still apply. Row pinning / reordering, undo-redo, and validators are all **opt-in** via a config object, off by default.
 
 ## Row pinning — sticky top / bottom bands
 
@@ -249,6 +249,14 @@ await grid.unpinColumn('actions');       // = pinColumn(key, null)
 
 Since 4.0 `pageChanged` reports the change that was applied, so two quick `nextPage()` calls report page 2 and then page 3, and a local page change no longer reruns sort / filter (custom hooks are not called; remote mode still reruns). A page size or quick filter cancelled through `pageChanging` / `quickFilterChanging` no longer leaves the selector or search box showing the refused value.
 
+Cancel with `event.preventDefault()`, which is the only way: a listener that returns `false` (or any falsy value) cancels nothing. Before 4.2 the `pageChanging` docs said a falsy return value cancelled the change; it never did.
+
+```ts
+grid.addEventListener('pageChanging', (e) => {
+  if (hasUnsavedEdits()) e.preventDefault();   // not `return false`
+});
+```
+
 **Paginator layout (4.0).** `pagination.paginator: 'full'` (default) shows the page size select, the "1-25 of 100" summary, first, previous, "page / count", next and last, and drops the select, then first / last, when the grid is too narrow, so previous and next stay reachable. `'compact'` always uses that narrow layout. Every paginator and toolbar part is styleable from outside (`paginator-button`, `paginator-prev`, `search-input`, ...; full list in SKILL.md §1.3). A `pageSize` missing from `pageSizeOptions` now appears in the selector.
 
 ```ts
@@ -289,6 +297,16 @@ grid.localeText = {
 };
 ```
 
+**4.2 key additions** (English and Spanish; the English defaults are the text shown before), all read only by `apex-grid-enterprise`: `panel.backToGrid` and `panel.shortcutHint` (the floating chart and Ask AI panels), `chart.title`, `chart.series.trend`, `chart.series.forecast`, `chart.series.forecastUpper`, `chart.series.forecastLower`, and `formula.parse.*` (one per formula parse error, such as `formula.parse.unexpectedToken`, plus `formula.parse.position`). A full `Record<GridLocaleKey, string>` translation must add them to compile. `esLocale` now addresses the user in one register (usted) and calls the grid "tabla" everywhere, so a few Spanish chart and AI hints read differently.
+
+**Removed in 5.0.0:** `filter.filter`, `chart.placeholder`, `ai.answer`, `formula.error.ref`, `formula.error.name`, `formula.error.div0`, `formula.error.value` and `formula.error.cycle` left `EN_LOCALE`, `esLocale` and `GridLocaleKey` (4.2 deprecated them). Nothing ever rendered them; delete them from a typed `localeText` object, where they are now a TypeScript error.
+
+The toolbar search placeholder and the paginator's page size label are set only through `localeText`: `'toolbar.searchPlaceholder'` and `'pagination.rowsPerPage'`. The toolbar's `placeholder` / `debounce` and the paginator's `pageSizeLabel` (`page-size-label`) properties are removed in 5.0; the grid never set them on the toolbar and paginator it renders.
+
+```ts
+grid.localeText = { 'toolbar.searchPlaceholder': 'Find a customer…', 'pagination.rowsPerPage': 'Rows' };
+```
+
 ## Column menu & column separator
 
 | Property | Type | Default | Notes |
@@ -313,13 +331,14 @@ grid.columnSeparator = false;
 | `'all'` | the raw `data` array |
 
 ```ts
-grid.exportToCSV();                                       // download data.csv (view)
+grid.exportFilename = 'customers';                        // 4.2: the toolbar menu downloads customers.csv
+grid.exportToCSV();                                       // download data.csv (view); exportFilename does not apply
 grid.exportToCSV({ filename: 'users', source: 'selected' });
 const text = grid.exportToCSV({ filename: '' });          // string only, no download
 grid.exportToCSV({ escapeFormulas: false });              // 3.6: opt out of formula escaping
 ```
 
-`exportFormats` *(getter)* → `readonly ExportFormat[]` (`{ id, label }`). The community grid offers CSV only; it drives the toolbar export menu, one item per entry, dispatching to `exportAs(formatId, options?)`. Other `ExportOptions` fields: `columns?` (narrows to these keys among the visible, exportable columns, kept in display order), `includeHeader?` (default `true`), `formatter?`; CSV (`CSVExportOptions`) adds `delimiter?` (`','`), `bom?` (`true`), `newline?` (`'\r\n'`), `escapeFormulas?` (`true`, 3.6).
+`exportFormats` *(getter)* → `readonly ExportFormat[]` (`{ id, label }`). The community grid offers CSV only; it drives the toolbar export menu, one item per entry, dispatching to `exportAs(formatId, { filename: grid.exportFilename })`. `exportFilename` (attribute `export-filename`, 4.2) defaults to `'data'` (an empty value falls back to it) and names every format in the menu (`.csv`, and `.xlsx` in the enterprise grid); it does not apply to your own `exportToCSV` / `exportAs` calls, where `filename` names the file. Other `ExportOptions` fields: `columns?` (narrows to these keys among the visible, exportable columns, kept in display order), `includeHeader?` (default `true`), `formatter?`; CSV (`CSVExportOptions`) adds `delimiter?` (`','`), `bom?` (`true`), `newline?` (`'\r\n'`), `escapeFormulas?` (`true`, 3.6).
 
 **Export output changes in 3.6:**
 

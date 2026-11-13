@@ -14,12 +14,13 @@ description: >
   sorting / filtering / quick-filter, pagination (full or compact paginator),
   inline editing, row selection, master-detail and tree rows, CSV export, batch
   writes via `applyEdits`, right-to-left layout, the UI-only event model, the
-  `dataPipelineConfiguration` hooks for server-side data, and upgrading from
-  apex-grid 3.x to 4.0.
+  `dataPipelineConfiguration` hooks for server-side data (optional, undefined
+  until assigned), and upgrading from apex-grid 3.x to 4.0 and from 4.x to 5.0
+  (the removed toolbar, paginator, setup and locale names).
 metadata:
   author: ApexCharts
-  version: "2.7.0"
-  library_version: "4.1.0"
+  version: "2.8.0"
+  library_version: "5.0.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -43,7 +44,7 @@ That is the whole install. `apex-grid` brings its own runtime dependencies (`lit
 
 > **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly. An Ignite UI theme on the page never fully themed the grid: through 3.x it only tinted the brand and replaced the font. From 4.0 the only way to make the grid follow an Ignite UI theme is the `apex-grid/ignite-ui` add-on (§1.3).
 
-> Confirmed working versions: `apex-grid@4.1.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.9.0`, which needs apex-grid 4.0; `apexcharts@8.4.1` or later for a `type: 'chart'` column). 4.0 is a major version: moving an app from 3.x, read §1.6 first.
+> Confirmed working versions: `apex-grid@5.0.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.10.0`, which depends on `apex-grid@^5.0.0`; `apexcharts@8.4.1` or later for a `type: 'chart'` column). 5.0 is a major version that only removes names 4.2 deprecated: moving an app from 4.x, read §1.7; from 3.x, read §1.6 first.
 
 ### 1.2 Register the element + size the host — `setup()` does both
 
@@ -86,6 +87,8 @@ apex-grid {
 
 > **Changed in 3.6.0:** the token defaults moved off the grid host onto `:where(:root)`, adopted into the document (through `adoptedStyleSheets`, so no CSP nonce) when the first grid connects. On 3.5 and earlier a value set on an ancestor never reached the grid, because the host's own default beat it; only values set on the `apex-grid` element took effect. Now both do, through shadow roots however deep.
 
+> **Changed in 4.2.0:** the chrome (toolbar, paginator, header actions, filter row, column menu, expand and tree toggles) is sized in px, like the text, tokens and row heights. Before, it followed the page's root font size, so on a page with `html { font-size: 62.5% }` the 24px targets shrank to 15px around 13px text, and a larger root (or a reader's raised browser font size) grew them. At the usual 16px root nothing changes. Size the grid through the `--ag-*` tokens, not the page's root font size.
+
 **Dark mode.** Add the `theme="dark"` attribute (an attribute, not a property). `theme="tinted"` mixes the brand into the chrome, and the two combine as `theme="dark tinted"`. A dark grid reads its own colour inputs, the `--ag-dark-*` tokens (`--ag-dark-surface`, `--ag-dark-surface-elevated`, `--ag-dark-grid-bg`, `--ag-dark-text`, `--ag-dark-text-muted`, `--ag-dark-hairline`, `--ag-dark-border`, `--ag-dark-row-hover`, `--ag-dark-shadow-card`, ...). Sizing, typography, motion, the brand and the base state colours are shared by both modes, so one place can theme light and dark grids:
 
 ```css
@@ -112,7 +115,7 @@ apex-grid::part(paginator-next)   { font-weight: 600; }
 apex-grid::part(search-input)     { font-size: 14px; }
 ```
 
-> The deprecated `setup({ theme })` option does **not** change the grid's appearance. It only ever forwarded to Ignite UI's `configureTheme()`, and since 3.5.0 it is inert and warns once. Omit it; use `--ag-*` variables (and the `theme="dark"` attribute) instead, and to follow an Ignite UI theme, the `apex-grid/ignite-ui` add-on below.
+> **Removed in 5.0.0:** `setup({ theme })`. `setup()` takes only `hostStyles` and `tokenStyles`. The `theme` option never changed the grid's appearance: it only forwarded to Ignite UI's `configureTheme()`, and from 3.5.0 through 4.x it did nothing but warn once. In 5.0 it is a TypeScript error, and a leftover `theme` in JavaScript is ignored silently. Delete it; use `--ag-*` variables (and the `theme="dark"` attribute) instead, and to follow an Ignite UI theme, the `apex-grid/ignite-ui` add-on below.
 
 **Ignite UI theming (new in 4.0.0).** The add-on ships with apex-grid 4.0; on 3.x `import 'apex-grid/ignite-ui'` does not resolve. To make grids follow an Ignite UI theme loaded on the page, import the add-on once. It needs no licence key of its own.
 
@@ -168,7 +171,7 @@ render(
 - **Visible borders** between rows and columns, and **hover state** on rows
 - **Sort arrows** (↕) next to each header (because `sort: true`)
 - A **filter row** below the headers with a "Filter" chip per column (because `filter: true`)
-- **Smooth virtualized scrolling** — only ~20 `<apex-grid-row>` elements exist in the DOM at once, even with thousands of rows
+- **Smooth virtualized scrolling**: only ~20 `<apex-grid-row>` elements exist in the DOM at once, even with thousands of rows (columns are not virtualized: each of those rows renders every column that is not `hidden`)
 
 If rows don't render at all, it's almost always the host height (§1.2). If the grid looks bare, you don't need a theme import — check your `--ag-*` overrides aren't fighting the defaults.
 
@@ -189,6 +192,26 @@ If rows don't render at all, it's almost always the host height (§1.2). If the 
 - **Noticeable, not breaking:** `pageItems` keeps the same array while nothing that shapes it changes; the column header row is no longer a Tab stop; the column menu opens in the top layer (it can extend outside the grid's box); a page change is announced once.
 
 New in 4.0: `showHeader`, `selection.isRowSelectable`, `pagination.paginator: 'compact'` (§5), `::part()` for every paginator and toolbar part (§1.3), `ctx.data` (§4), the Ignite UI add-on and the family `--apx-*` tokens (§1.3), IME input and numbers typed in full width or with the locale's grouping (§5), and locale keys for text that stayed English (`references/state-and-features.md`).
+
+### 1.7 Upgrading from 4.x (5.0.0)
+
+5.0 removes what 4.2.0 deprecated, plus the `setup({ theme })` option. Nothing else changes: an app that uses none of these names upgrades without edits.
+
+- **Toolbar `placeholder` / `debounce` and paginator `pageSizeLabel` (attribute `page-size-label`):** delete them. The grid never set them on the toolbar and paginator it renders. Set the grid's `localeText` keys instead: `'toolbar.searchPlaceholder'` (the search box placeholder) and `'pagination.rowsPerPage'` (the page size label). The quick filter always waits 200 ms.
+- **Locale keys `filter.filter`, `chart.placeholder`, `ai.answer` and `formula.error.ref` / `.name` / `.div0` / `.value` / `.cycle`:** delete them from a typed `localeText` object (they left `EN_LOCALE`, `esLocale` and `GridLocaleKey`). None of them ever changed any text.
+- **`setup({ theme })`:** delete the option (`ApexGridSetupOptions.theme` is gone). It did nothing but warn (§1.3).
+- **`grid.dataPipelineConfiguration` is typed optional** (`DataPipelineConfiguration<T> | undefined`), as it always was at runtime: it is `undefined` until you assign it. Read it with optional chaining (`grid.dataPipelineConfiguration?.sort`) and assign a whole object rather than a field on the current value.
+
+**New in 4.2.0** (all still in 5.0):
+
+- `exportFilename` (attribute `export-filename`, default `'data'`) names the file the toolbar export menu downloads (CSV, and XLSX in the enterprise grid). It applies to the menu only: `exportToCSV()` without a `filename` still downloads `data.csv`, and a `filename` passed to `exportToCSV` / `exportAs` names that call's file.
+- The types `BadgeVariant`, `StatusVariant`, `ColumnDateFormat`, `ColumnSelectOption` (§4) and `ToolbarAction` (`{ id, label, run() }`, an entry of the read-only `toolbarActions` getter that a derived grid such as `apex-grid-enterprise` overrides to add toolbar buttons) import from `apex-grid`.
+- The chrome is sized in px and no longer follows the page's root font size (§1.3).
+- `apex-grid/custom-elements.json` (the Custom Elements Manifest) and `apex-grid/package.json` are importable, for tools that read the manifest.
+- New locale keys, mostly for `apex-grid-enterprise` panels (`references/state-and-features.md`); `esLocale` addresses the user as usted and calls the grid "tabla" throughout.
+- Docs fix: a `pageChanging` listener cancels the change only with `event.preventDefault()`; returning a falsy value does nothing (§5).
+
+Grids with hundreds of columns: rows are virtualized, columns are not, so DOM size and scroll time grow with the visible column count (`references/data-pipeline.md`).
 
 ---
 
@@ -269,6 +292,8 @@ interface ColumnConfiguration<T extends object, K extends keyof T = keyof T> {
 ```
 
 Applied defaults (`DEFAULT_COLUMN_CONFIG`): `{ type: 'string', resizable: false, hidden: false, sort: false, filter: false }`. Sort and filter are **off** until you opt in. (`exportable` isn't in that object but behaves as `true` unless set to `false`.)
+
+Since 4.2.0 the option types are exported, so a helper that builds columns can name them: `import type { BadgeVariant, StatusVariant, ColumnDateFormat, ColumnSelectOption } from 'apex-grid'` (`'gold' | 'brand' | 'neutral' | 'muted'`, `'active' | 'trial' | 'churn'`, the `format` presets, and one `options` entry, `V | { value: V; label?: string }`).
 
 ### Column types (`DataType`)
 
@@ -378,11 +403,12 @@ grid.sort({ key: 'name', direction: 'ascending' });       // programmatic (silen
 | `columns` | `ColumnConfiguration<T>[]` | Each entry merged with column defaults. |
 | `autoGenerate` (attr `auto-generate`) | `boolean` | Ignored if `columns` is non-empty. |
 | `sortConfiguration` | `{ multiple, triState }` | Multi-column + tri-state sorting toggles. |
-| `dataPipelineConfiguration` | `{ sort?, filter?, quickFilter? }` | Server-side / async hooks (§ data-pipeline). 4.0 removed the never-called `pagination` hook: page on the server with `pagination.mode: 'remote'`. |
+| `dataPipelineConfiguration` | `{ sort?, filter?, quickFilter? } \| undefined` | Server-side / async hooks (§ data-pipeline). `undefined` until you assign it (typed optional since 5.0): assign a whole object, read with `?.`. 4.0 removed the never-called `pagination` hook: page on the server with `pagination.mode: 'remote'`. |
 | `rowRecycling` (attr `row-recycling`) | `boolean` | Default `true` (4.0): body row elements are re-bound to other records on scroll, sort and filter. `false` (`row-recycling="false"`) keeps record-keyed rows for templates that hold element state (§1.6). |
 | `showHeader` (attr `show-header`) | `boolean` | Default `true`. `false` (4.0) leaves out the column header row, the column group row and the filter panel, so a short grid (a dashboard tile) gives that room to the rows. Screen readers still announce the column names; sort, filter, widths and the page are kept. While hidden, resizing, the column menu, drag reorder and the header filter button are unavailable. |
 | `quickFilter` (attr `quick-filter`) | `string` | Global substring search across visible columns. |
-| `showQuickFilter` / `showExport` | `boolean` | Toolbar UI toggles for quick-filter input / export menu. |
+| `showQuickFilter` / `showExport` | `boolean` | Toolbar UI toggles for quick-filter input / export menu. The search placeholder and page size label come from `localeText` (`'toolbar.searchPlaceholder'`, `'pagination.rowsPerPage'`); 5.0 removed the toolbar's `placeholder` / `debounce` and the paginator's `pageSizeLabel`. |
+| `exportFilename` (attr `export-filename`) | `string` | Default `'data'` (4.2). The file name, without extension, the toolbar export menu downloads to. Menu only: an `exportToCSV()` / `exportAs()` call names its own file with `filename`. |
 | `columnReordering` (attr `column-reordering`) | `boolean` | Drag-reorder headers; per-column opt-out via `reorderable`. |
 | `columnMenu` | `boolean` | Header kebab-menu button. Default `true`; set `false` to hide. |
 | `columnSeparator` (attr `column-separator`) | `boolean` | Persistent header dividers (also the resize handle). Default `true`; theme via `--ag-header-separator`. |
@@ -436,7 +462,7 @@ Declarative validators (`column.validators`), column groups (`columnGroups`), un
 | `updateColumns(col \| col[])` | Merge new fields into existing columns by `key`. Triggers a pipeline run. |
 | `moveColumn(fromKey, toKey, position?)` | Reorder a column (within its pinning group). |
 | `pinColumn(key, 'start' \| 'end' \| null)` / `unpinColumn(key)` | Programmatic column pinning → `Promise<boolean>`; emits `columnPinning`/`columnPinned`. |
-| `exportToCSV(options?)` / `exportAs(formatId, options?)` | Export the data. CSV is built in. `options.source`: `'view'`(def)/`'page'`/`'selected'`/`'all'`. Formula-like CSV text (leading `=`, `+`, `-`, `@`, tab or CR; a plain signed number such as `-5` excepted) gets a leading apostrophe unless `escapeFormulas: false` (3.6). |
+| `exportToCSV(options?)` / `exportAs(formatId, options?)` | Export the data. CSV is built in. Without `options.filename` the download is `data.csv` (`exportFilename` names only the toolbar menu's file). `options.source`: `'view'`(def)/`'page'`/`'selected'`/`'all'`. Formula-like CSV text (leading `=`, `+`, `-`, `@`, tab or CR; a plain signed number such as `-5` excepted) gets a leading apostrophe unless `escapeFormulas: false` (3.6). |
 | pagination | `gotoPage(n)`, `setPageSize(n)`, `nextPage()`, `previousPage()`, `firstPage()`, `lastPage()` → `Promise<boolean>`; emit `pageChanging`/`pageChanged`. |
 | `setQuickFilter(value)` | Apply global search (`''` clears) → `Promise<boolean>`; emits `quickFilterChanging`/`quickFilterChanged`. |
 | selection | `selectRow`, `deselectRow`, `toggleRowSelection`, `selectAllRows`, `clearSelection`, `isRowSelected` |
@@ -453,7 +479,7 @@ Declarative validators (`column.validators`), column groups (`columnGroups`), un
 
 ### Events — UI-initiated only
 
-Every event fires only for operations driven through the grid's own UI; programmatic API calls are silent. The `*-ing` events are **cancellable** (call `event.preventDefault()`); the `*-ed` events are notifications. `event.detail` carries the relevant payload.
+Every event fires only for operations driven through the grid's own UI; programmatic API calls are silent. The `*-ing` events are **cancellable** (call `event.preventDefault()`; that is the only way: returning `false` or another falsy value from a listener cancels nothing, `pageChanging` included, whose docs said otherwise before 4.2); the `*-ed` events are notifications. `event.detail` carries the relevant payload.
 
 | Pairs (`-ing` cancellable / `-ed` after) | Triggered by |
 |---|---|
@@ -543,7 +569,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 ✅ `setup()` (or `import 'apex-grid/define'`) once at app startup.
 
 ### 3. Importing a theme CSS that no longer exists
-❌ `import 'igniteui-webcomponents/themes/light/bootstrap.css'` + `setup({ theme: 'bootstrap' })` is obsolete; it never affected the grid, and as of 3.5.0 the option is inert and that package is not even installed.
+❌ `import 'igniteui-webcomponents/themes/light/bootstrap.css'` + `setup({ theme: 'bootstrap' })` is obsolete; it never affected the grid, that package is not installed since 3.5.0, and 5.0.0 removed the `theme` option (a TypeScript error; JavaScript ignores it).
 ✅ Nothing to import for a styled grid: it styles itself; retheme via `--ag-*` CSS variables. The only required CSS is a host **height**. To follow an Ignite UI theme that the page loads, the path is the `apex-grid/ignite-ui` add-on (apex-grid 4.0, §1.3), not a theme import into the grid.
 
 ### 4. Stringified `columns` attribute
@@ -594,6 +620,10 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 ❌ `expect(grid.getAttribute('role')).toBe('grid')` or `grid.getAttribute('aria-rowcount')` in a test: the host no longer carries them.
 ✅ `grid.shadowRoot!.querySelector('[part~="table"]')!.getAttribute('role')`. Name the grid with `aria-label` / `aria-labelledby` on the host as before.
 
+### 16. Setting the toolbar or paginator text directly, or writing a hook onto the pipeline config (5.0)
+❌ `toolbar.placeholder = 'Find…'`, `debounce="500"`, `paginator.pageSizeLabel = 'Rows'` / `page-size-label`: removed in 5.0 (on 4.x the grid never set them, so they did nothing on its own toolbar and paginator). Also ❌ `grid.dataPipelineConfiguration.sort = fn` on a fresh grid: the property is `undefined` until assigned, so this throws.
+✅ `grid.localeText = { 'toolbar.searchPlaceholder': 'Find…', 'pagination.rowsPerPage': 'Rows' }`; `grid.dataPipelineConfiguration = { ...grid.dataPipelineConfiguration, sort: fn }`.
+
 ---
 
 ## 7. Reference Routing Table
@@ -601,6 +631,7 @@ Arrow-key navigation, column resize and column reorder all follow inline order r
 | Topic | Reference File |
 |---|---|
 | Upgrading an app from 3.x to 4.0 | §1.6 |
+| Upgrading an app from 4.x to 5.0, and what 4.2 added (`exportFilename`, exported types, px chrome) | §1.7 |
 | Column types, templates (`ctx.data`, row recycling), auto-generation, per-column styling, header/editor templates | `references/columns-and-templates.md` |
 | Sort & filter — operands, expressions, multi-column, quick-filter, events | `references/sort-and-filter.md` |
 | Server-side data hooks (sort/filter/quickFilter), remote pagination, virtualization, `dataView` | `references/data-pipeline.md` |

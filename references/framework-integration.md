@@ -1,6 +1,6 @@
 # Framework Integration — Lit, React, Vue, Angular
 
-`apex-grid` is a standard custom element with no first-party framework wrappers. Every framework consumes it the same way:
+`apex-grid` is a standard custom element, and every framework can consume it directly (React also has an optional first-party wrapper package, `react-apex-grid`, below). Used directly, every framework consumes it the same way:
 
 1. **Register the element + size the host once at app startup** — `setup()` does both (registers `<apex-grid>` and adopts a bounded host height). No theme CSS import is needed; the grid self-styles via `--ag-*` variables.
 2. **Bind `data` and `columns` as properties** (not attributes).
@@ -125,6 +125,22 @@ declare module 'react' {
   }
 }
 ```
+
+### Optional: the `react-apex-grid` wrapper
+
+`react-apex-grid` (0.2.0) wraps the element with `@lit/react`: props instead of a ref for `data` / `columns`, `on<Event>` handlers, and a typed ref. It registers `<apex-grid>` itself in the browser (and nothing on a server). Its peers are `apex-grid` `^3.5.0 || ^4.0.0 || ^5.0.0`, `react` and `react-dom` 18 or later.
+
+```tsx
+import { createApexGrid } from 'react-apex-grid';
+const UserGrid = createApexGrid<User>();          // data: User[], columns: ColumnConfiguration<User>[]
+
+<UserGrid data={users} columns={columns} style={{ height: 480 }}
+          onSorted={(e) => console.log(e.detail)} />
+```
+
+- **Props are the grid's settable properties only** (0.2.0), plus the `theme` attribute, `on<Event>` handlers and standard HTML props. Read-only members (`totalItems`, `pageCount`, `canUndo`, `dataView`, ...) and methods (`sort`, `getState`, ...) are TypeScript errors as props (on 0.1.x passing a read-only one threw at runtime and unmounted the React root): read or call them through the ref (`ApexGridElement<T>`).
+- **No `ApexGridToolbar` / `ApexGridPaginator` components** (removed in 0.2.0): they rendered an empty element outside the grid. The grid renders its own toolbar and paginator; configure them with `showQuickFilter`, `showExport`, `exportFilename` and `pagination`.
+- It renders the community `<apex-grid>` only. For `<apex-grid-enterprise>`, wrap that element with `@lit/react` yourself (the `react-apex-grid` README shows how).
 
 ---
 

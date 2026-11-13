@@ -22,6 +22,7 @@ AI models routinely get web-component grid code wrong: they treat `<apex-grid>` 
 
 - **Quickstart**: register + size the host (`setup()` does both); no theme import, since the grid self-styles via `--ag-*` CSS variables; the `apex-grid/ignite-ui` add-on (apex-grid 4.0, no extra licence key) follows an Ignite UI theme
 - **Upgrading from 3.x to 4.0**: row recycling and `ctx.data`, the grid role on `[part~="table"]`, pagination and validator changes
+- **Upgrading from 4.x to 5.0**: the removed toolbar `placeholder` / `debounce`, paginator `pageSizeLabel`, `setup({ theme })` and unused locale keys, the optional `dataPipelineConfiguration`, and what 4.2 added (`exportFilename`, exported option types, px-sized chrome)
 - **Custom-element registration** — `setup()`, `import 'apex-grid/define'`, or `ApexGrid.register()`
 - **Generic `ColumnConfiguration<T>`**: `key`, the 14 column `type`s (incl. `date`, `select`, `currency`, and the 4.1 `chart` type, an ApexCharts chart per cell), templates, `sort`, `filter`, `pinned`, explicit widths
 - **Lit cell, header & editor templates** with the right context shapes
@@ -31,7 +32,7 @@ AI models routinely get web-component grid code wrong: they treat `<apex-grid>` 
 - **CSV export & column reordering/pinning**
 - **Virtualization** — `grid.rows` vs `grid.dataView` vs `grid.totalItems`
 - **Vanilla JS** — full setup without using Lit's `render()` in app code
-- **Framework integration** — Lit, React, Vue, Angular
+- **Framework integration**: Lit, React (direct, or the optional `react-apex-grid` wrapper), Vue, Angular
 
 ## Installation
 

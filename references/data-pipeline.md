@@ -25,6 +25,14 @@ interface DataPipelineConfiguration<T extends object> {
 
 The grid invokes the matching hook in place of its built-in pipeline stage. Whatever the hook returns becomes the input for the next stage (or the final view). All three hooks are optional: omit a stage to keep it in-memory.
 
+`grid.dataPipelineConfiguration` itself is optional too: it is `undefined` until you assign it (the grid sets no default), and since 5.0 its type says so (`DataPipelineConfiguration<T> | undefined`), so TypeScript that read it without a guard stops compiling. Assign a whole object, and read it with optional chaining:
+
+```ts
+grid.dataPipelineConfiguration = { ...grid.dataPipelineConfiguration, sort: fetchSorted };
+const hasRemoteSort = Boolean(grid.dataPipelineConfiguration?.sort);
+// ❌ grid.dataPipelineConfiguration.sort = fetchSorted;   // throws on a fresh grid
+```
+
 > **Changed in 4.0.0 (types only):** `DataPipelineConfiguration.pagination` and the `'pagination'` value of `DataPipelineParams.type` are removed. The hook was documented but never called, so nothing changes at runtime, but TypeScript that sets it stops compiling. Page on the server with remote pagination (below).
 
 ```ts
@@ -137,6 +145,8 @@ Implications:
 - **Don't hold references to `<apex-grid-row>` elements** across a scroll, sort or filter: read `row.data` each time, never keep the element as a handle to a record.
 - **DOM-driven row queries** (`document.querySelectorAll('apex-grid-row')`) only see visible rows.
 
+**Wide grids.** Rows are virtualized and recycled; columns are not. Every rendered row renders all of its columns that are not `hidden`, including the ones scrolled out of view horizontally, so DOM size and scroll time grow with the column count. The apex-grid README measured, on a desktop Mac with 1,000 rows, about 10,500 DOM nodes and a 39 ms scroll jump at 100 visible columns, and about 52,000 nodes and 184 ms at 500. For hundreds of columns, set `hidden: true` on the columns the user does not need and combine related fields into one column with a `cellTemplate`.
+
 ## When the pipeline runs
 
 Internally the grid watches the `'pipeline'` reactive symbol. It runs after:
@@ -176,6 +186,7 @@ Assigning `grid.data = null` or `undefined` (a framework prop still loading) sho
 |---|---|
 | Reading `grid.rows.length` for total count | `grid.totalItems` (or `grid.dataView.length`) |
 | Caching `<apex-grid-row>` references across scrolls, sorts or filters | Look them up fresh from `grid.rows` (or operate on `grid.dataView` data) |
+| `grid.dataPipelineConfiguration.filter = fn`, or reading `grid.dataPipelineConfiguration.sort` unguarded | It is `undefined` until assigned (typed optional in 5.0): assign a whole object, read with `?.` |
 | `dataPipelineConfiguration.pagination` to page on the server | Removed in 4.0 (it was never called): `pagination.mode: 'remote'` + `pageChanged` + `pagination.totalItems` |
 | Re-fetching from the server only on UI events | Hooks fire for both UI and programmatic — debounce / abort inside the hook |
 | Sorting in the `filter` hook expecting it to override the built-in sort | The grid still runs the built-in sort after your filter hook unless you also supply a `sort` hook |
