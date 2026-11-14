@@ -20,7 +20,7 @@ description: >
 metadata:
   author: ApexCharts
   version: "2.8.0"
-  library_version: "5.0.0"
+  library_version: "5.1.0"
   category: data-visualization
   tags: [grid, data-grid, table, web-component, lit, apex-grid]
   docs: https://github.com/apexcharts/apexgrid
@@ -44,7 +44,7 @@ That is the whole install. `apex-grid` brings its own runtime dependencies (`lit
 
 > **Changed in 3.5.0:** earlier versions also pulled in `igniteui-webcomponents` and `igniteui-theming` transitively. Both are gone. The grid never registered an Ignite UI element, so nothing you wrote against the grid is affected, but code that relied on `igc-*` elements being installed as a side effect must now depend on that package directly. An Ignite UI theme on the page never fully themed the grid: through 3.x it only tinted the brand and replaced the font. From 4.0 the only way to make the grid follow an Ignite UI theme is the `apex-grid/ignite-ui` add-on (§1.3).
 
-> Confirmed working versions: `apex-grid@5.0.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.10.0`, which depends on `apex-grid@^5.0.0`; `apexcharts@8.4.1` or later for a `type: 'chart'` column). 5.0 is a major version that removes the names 4.2 deprecated plus `setup({ theme })`, and types `dataPipelineConfiguration` as optional: moving an app from 4.x, read §1.7; from 3.x, read §1.6 first.
+> Confirmed working versions: `apex-grid@5.1.0`, `lit@^3.3.0` (and `apex-grid-enterprise@0.11.0`, which depends on `apex-grid@^5.1.0`; `apexcharts@8.4.1` or later for a `type: 'chart'` column). 5.0 is a major version that removes the names 4.2 deprecated plus `setup({ theme })`, and types `dataPipelineConfiguration` as optional: moving an app from 4.x, read §1.7; from 3.x, read §1.6 first.
 
 ### 1.2 Register the element + size the host — `setup()` does both
 
@@ -202,7 +202,14 @@ New in 4.0: `showHeader`, `selection.isRowSelectable`, `pagination.paginator: 'c
 - **`setup({ theme })`:** delete the option (`ApexGridSetupOptions.theme` is gone). It did nothing but warn (§1.3).
 - **`grid.dataPipelineConfiguration` is typed optional** (`DataPipelineConfiguration<T> | undefined`), as it always was at runtime: it is `undefined` until you assign it. Read it with optional chaining (`grid.dataPipelineConfiguration?.sort`) and assign a whole object rather than a field on the current value.
 
-**New in 4.2.0** (all still in 5.0):
+**New in 5.1.0:**
+
+- Sparkline cells have an accessible name: the graphic is `role="img"` and reads like "5 values, 12 to 23, up 92%", and the visible delta label is `aria-hidden`. Set a column's own name with `sparkline: { label }`, a string or a function of the value and record (type `ColumnSparklineConfiguration`, §4). New locale keys `cell.sparkline`, `cell.sparklineUp`, `cell.sparklineDown` and `cell.sparklineFlat`.
+- Row recycling: a row moved by a scroll step shows its new record before its elements reconnect, so a custom element in a cell template that reads its data in `connectedCallback` builds for the right row (`references/columns-and-templates.md`, Row recycling).
+- Locale keys `panel.move`, `panel.moveHint`, `panel.moved`, `panel.resize`, `panel.resizeHint` and `panel.resized`, read only by the `apex-grid-enterprise` floating chart and Ask AI panels, which can be moved and resized from the keyboard in enterprise 0.11.0.
+- `react-apex-grid` 0.3.0 adds a `react-apex-grid/enterprise` entry (`references/framework-integration.md`).
+
+**New in 4.2.0** (all still in 5.x):
 
 - `exportFilename` (attribute `export-filename`, default `'data'`) names the file the toolbar export menu downloads (CSV, and XLSX in the enterprise grid). It applies to the menu only: `exportToCSV()` without a `filename` still downloads `data.csv`, and a `filename` passed to `exportToCSV` / `exportAs` names that call's file.
 - The types `BadgeVariant`, `StatusVariant`, `ColumnDateFormat`, `ColumnSelectOption` (§4) and `ToolbarAction` (`{ id, label, run() }`, an entry of the read-only `toolbarActions` getter that a derived grid such as `apex-grid-enterprise` overrides to add toolbar buttons) import from `apex-grid`.
@@ -281,6 +288,9 @@ interface ColumnConfiguration<T extends object, K extends keyof T = keyof T> {
   badgeVariant?: 'gold' | 'brand' | 'neutral' | 'muted' | ((v) => …);   // 'badge'
   statusVariant?: 'active' | 'trial' | 'churn' | ((v) => …);            // 'status'
   showDelta?: boolean;                     // 'sparkline' trailing delta label (default true)
+  sparkline?: {                            // 'sparkline' (5.1)
+    label?: string | ((value, data: T) => string);   //   accessible name (default '{count} values, {first} to {last}, {trend}')
+  };
   chart?: {                                // 'chart' (4.1): an ApexCharts chart per cell
     type?: string;                         //   ApexCharts type (default 'line')
     height?: number;                       //   px (default 28)

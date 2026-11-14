@@ -32,7 +32,7 @@ AI models routinely get web-component grid code wrong: they treat `<apex-grid>` 
 - **CSV export & column reordering/pinning**
 - **Virtualization** — `grid.rows` vs `grid.dataView` vs `grid.totalItems`
 - **Vanilla JS** — full setup without using Lit's `render()` in app code
-- **Framework integration**: Lit, React (direct, or the optional `react-apex-grid` wrapper), Vue, Angular
+- **Framework integration**: Lit, React (direct, or the optional `react-apex-grid` wrapper and its `react-apex-grid/enterprise` entry), Vue, Angular
 
 ## Installation
 

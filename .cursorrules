@@ -4,7 +4,7 @@ You are working with `apex-grid`, a Lit-based web-component data grid by ApexCha
 Documentation: https://github.com/apexcharts/apexgrid
 NPM: apex-grid (with a hyphen — no `apexgrid` package exists)
 GitHub: https://github.com/apexcharts/apexgrid
-Confirmed versions: apex-grid@5.0.0, lit@^3.3.0 (apex-grid-enterprise@0.10.0 depends on apex-grid ^5.0.0; apexcharts@8.4.1 or later for a `type: 'chart'` column).
+Confirmed versions: apex-grid@5.1.0, lit@^3.3.0 (apex-grid-enterprise@0.11.0 depends on apex-grid ^5.1.0; apexcharts@8.4.1 or later for a `type: 'chart'` column).
 Upgrading from 3.x: see "Changed in 4.0" at the end; from 4.x: see "Changed in 4.2 and 5.0".
 
 ## Quickstart — register + size the host

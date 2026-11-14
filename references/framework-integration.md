@@ -128,7 +128,7 @@ declare module 'react' {
 
 ### Optional: the `react-apex-grid` wrapper
 
-`react-apex-grid` (0.2.0) wraps the element with `@lit/react`: props instead of a ref for `data` / `columns`, `on<Event>` handlers, and a typed ref. It registers `<apex-grid>` itself in the browser (and nothing on a server). Its peers are `apex-grid` `^3.5.0 || ^4.0.0 || ^5.0.0`, `react` and `react-dom` 18 or later.
+`react-apex-grid` (0.3.0) wraps the element with `@lit/react`: props instead of a ref for `data` / `columns`, `on<Event>` handlers, and a typed ref. It registers `<apex-grid>` itself in the browser (and nothing on a server). Its peers are `apex-grid` `^3.5.0 || ^4.0.0 || ^5.0.0`, `react` and `react-dom` 18 or later.
 
 ```tsx
 import { createApexGrid } from 'react-apex-grid';
@@ -140,7 +140,22 @@ const UserGrid = createApexGrid<User>();          // data: User[], columns: Colu
 
 - **Props are the grid's settable properties only** (0.2.0), plus the `theme` attribute, `on<Event>` handlers and standard HTML props. Read-only members (`totalItems`, `pageCount`, `canUndo`, `dataView`, ...) and methods (`sort`, `getState`, ...) are TypeScript errors as props (on 0.1.x passing a read-only one threw at runtime and unmounted the React root): read or call them through the ref (`ApexGridElement<T>`).
 - **No `ApexGridToolbar` / `ApexGridPaginator` components** (removed in 0.2.0): they rendered an empty element outside the grid. The grid renders its own toolbar and paginator; configure them with `showQuickFilter`, `showExport`, `exportFilename` and `pagination`.
-- It renders the community `<apex-grid>` only. For `<apex-grid-enterprise>`, wrap that element with `@lit/react` yourself (the `react-apex-grid` README shows how).
+- **Enterprise: `react-apex-grid/enterprise`** (0.3.0) wraps `<apex-grid-enterprise>` (`ApexGridEnterprise`, and the row-typed `createApexGridEnterprise<T>()`) and the six companion elements: `ApexGridToolPanel`, `ApexGridStatusBar`, `ApexGridSetFilter`, `ApexGridFilterBuilder`, `ApexGridChart` and `ApexGridAI`. `apex-grid-enterprise` (0.10.0 or later, below 1.0) is an optional peer that only this entry imports, so community apps install nothing new. Importing the entry turns on every enterprise feature module and registers the elements in the browser only. Enterprise properties (`groupBy`, `aggregations`, `pivotOn`, `rangeSelection`, ...) are props and enterprise events map to handlers by the same rule (`apex-range-changed` is `onApexRangeChanged`). A companion follows a grid through its `grid` prop: keep the grid element in state with a ref callback so the companion re-renders once the grid mounts.
+
+```tsx
+import { useState } from 'react';
+import { ApexGridStatusBar, type ApexGridEnterpriseElement, createApexGridEnterprise } from 'react-apex-grid/enterprise';
+const SalesGrid = createApexGridEnterprise<Sale>();
+
+function Sales({ sales }: { sales: Sale[] }) {
+  const [grid, setGrid] = useState<ApexGridEnterpriseElement<Sale> | null>(null);
+  return (<>
+    <SalesGrid ref={setGrid} data={sales} columns={columns} groupBy={['region']} style={{ height: 480 }}
+               onApexRangeChanged={(e) => console.log(e.detail.stats.sum)} />
+    <ApexGridStatusBar grid={grid} />
+  </>);
+}
+```
 
 ---
 

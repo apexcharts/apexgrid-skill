@@ -40,6 +40,7 @@ interface BaseColumnConfiguration<T extends object, K extends keyof T = keyof T>
   badgeVariant?: 'gold' | 'brand' | 'neutral' | 'muted' | ((v) => …);  // 'badge'
   statusVariant?: 'active' | 'trial' | 'churn' | ((v) => …);           // 'status'
   showDelta?: boolean;                             // 'sparkline' (def true)
+  sparkline?: { label?: string | ((value, data: T) => string) };   // 'sparkline' (5.1): accessible name
   chart?: {                                        // 'chart' (4.1): an ApexCharts chart per cell
     type?: string; height?: number; width?: number | string;   // def 'line', 28, '100%'
     options?: object | ((value, data: T) => object);           // ApexOptions over the row defaults
@@ -133,6 +134,35 @@ import { keyed } from 'lit/directives/keyed.js';
 ```
 
 To keep record-keyed rows (each element stays with its record), opt out: `grid.rowRecycling = false` or `<apex-grid row-recycling="false">`. Detail panel content follows its record and keeps its DOM state without any change, and a grid created inside a `detailTemplate` keeps its own setting. Pinned rows are not recycled, but a pinned band can re-bind its elements (when a row above is unpinned), which is why `ctx.data` is the safe read everywhere.
+
+**Custom elements in a cell (5.1).** A scroll step moves the rows that left the view to its other end, and moving a row disconnects and reconnects every custom element in it. From 5.1 a moved row already shows its new record when it reconnects, so `connectedCallback` reads the right data (on 4.x and 5.0 it usually saw the record of the row it was leaving). Two more rules keep an element that hosts a widget (a chart, a map, anything built on connect) correct and cheap:
+
+- **Defer tear-down.** In `disconnectedCallback`, check `isConnected` a microtask later and tear down only if the element is still off the page. A move reconnects it within the same task.
+- **React to the data property** (a setter, or a Lit reactive property) rather than reading it once on connect. A sort, a filter that keeps the rendered range, and a long jump (a scrollbar drag, setting `scrollTop`, a page change) re-bind rows where they stand, without disconnecting them, so connect never runs for the new record.
+
+```ts
+// `Widget` and `createWidget` stand for whatever the cell draws with.
+class SparkCell extends HTMLElement {
+  #record?: Row;
+  #widget?: Widget;
+  set record(record: Row) {
+    this.#record = record;
+    this.#widget?.update(record); // a re-bind, in place or ahead of a move
+  }
+  connectedCallback() {
+    this.#widget ??= createWidget(this, this.#record); // a move reconnects an element that has its widget
+  }
+  disconnectedCallback() {
+    queueMicrotask(() => {
+      if (this.isConnected) return; // moved, not removed
+      this.#widget?.destroy();
+      this.#widget = undefined;
+    });
+  }
+}
+```
+
+Built-in `type: 'chart'` cells already work this way.
 
 Since 3.6 a `cellTemplate` runs again for every visible row, body and pinned, after each pipeline run (sort, filter, quick filter, edit, tree toggle), so a template that reads other fields of `ctx.data` stays current after an edit to another cell. Keep templates cheap; plain and typed cells are not re-rendered this way. In row edit mode, `commit(value)` stages the value with the row edit instead of writing straight to the record (3.6), so `cancelEdit()` rolls it back.
 
